@@ -1,0 +1,19 @@
+# ─── Supabase ───────────────────────────────────────────────────────────────
+# Encontre em: app.supabase.com → seu projeto → Settings → API
+NEXT_PUBLIC_SUPABASE_URL=https://XXXXXXXXXXXXXXXX.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIs...  # NUNCA exponha no cliente!
+
+# ─── JWT ────────────────────────────────────────────────────────────────────
+# Gere com: openssl rand -base64 64
+JWT_SECRET=sua_chave_super_secreta_aqui_64_chars_minimo
+
+# ─── Brevo (e-mail transacional) ────────────────────────────────────────────
+# Encontre em: app.brevo.com → Settings → SMTP & API → API Keys
+BREVO_API_KEY=xkeysib-XXXXXXXXXXXXXXXXXXXXXXXX
+
+# E-mail remetente (deve estar verificado no Brevo como sender)
+EMAIL_FROM=poc-manager@mercadolivre.com
+EMAIL_FROM_NAME=POC Manager MTM
+
+# ─── App ────────────────────────────────────────────────────────────────────
+NEXT_PUBLIC_APP_URL=https://poc-manager.vercel.app
