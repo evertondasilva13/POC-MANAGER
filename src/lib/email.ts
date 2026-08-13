@@ -25,7 +25,7 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
   const body = {
     sender: { name: FROM_NAME, email: FROM_EMAIL },
     to: params.to,
-    cc: ...(params.cc && params.cc.length > 0 ? { cc: params.cc } : {}),
+    ...(params.cc && params.cc.length > 0 ? { cc: params.cc } : {}),
     subject: params.subject,
     htmlContent: params.htmlContent,
     textContent: params.textContent ?? params.htmlContent.replace(/<[^>]+>/g, ''),
