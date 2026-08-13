@@ -119,18 +119,11 @@ export interface PocEmailData {
 export function buildApprovalEmail(
   poc: PocEmailData,
   recipientName: string,
-  creatorEmail: string,
+  approveUrl: string,
+  rejectUrl: string,
   isReminder = false,
   daysPending = 0
 ): string {
-  const approveSubject = encodeURIComponent(`✅ APROVADO — ${poc.nome}`)
-  const approveBody = encodeURIComponent(`Aprovo a POC "${poc.nome}".\n\n— ${recipientName}`)
-  const rejectSubject = encodeURIComponent(`❌ REPROVADO — ${poc.nome}`)
-  const rejectBody = encodeURIComponent(`Não aprovo a POC "${poc.nome}".\n\nMotivo: [descreva aqui]\n\n— ${recipientName}`)
-
-  const approveLink = `mailto:${creatorEmail}?subject=${approveSubject}&body=${approveBody}`
-  const rejectLink = `mailto:${creatorEmail}?subject=${rejectSubject}&body=${rejectBody}`
-
   return `
   <div style="${baseStyle}">
     <div style="${headerStyle}">
@@ -150,12 +143,12 @@ export function buildApprovalEmail(
           : 'Você foi indicado(a) como aprovador(a) da seguinte Prova de Conceito:'}
       </p>
       ${pocInfoBlock(poc)}
-      <p style="font-size:13px;margin-bottom:8px"><b>Para responder, clique em uma das opções:</b></p>
-      <a href="${approveLink}" style="${btnStyle('#2E7D5E')}">✅ Aprovar</a>
-      <a href="${rejectLink}" style="${btnStyle('#C0392B')}">❌ Reprovar</a>
+      <p style="font-size:13px;margin-bottom:8px"><b>Clique em uma das opções abaixo para registrar sua resposta:</b></p>
+      <a href="${approveUrl}" style="${btnStyle('#2E7D5E')}">✅ Aprovar</a>
+      <a href="${rejectUrl}" style="${btnStyle('#C0392B')}">❌ Reprovar</a>
       <p style="font-size:11px;color:#717171;margin-top:16px;line-height:1.5">
-        Ao clicar, seu cliente de e-mail abrirá com uma resposta pré-preenchida. Basta enviar.<br>
-        Esta solicitação é exclusiva para <b>${recipientName}</b>.
+        Ao clicar, sua resposta será registrada automaticamente no sistema.<br>
+        Este link é exclusivo para <b>${recipientName}</b> e só pode ser usado uma vez.
       </p>
     </div>
     <div style="${footerStyle}">
