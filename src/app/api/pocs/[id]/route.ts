@@ -29,7 +29,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       poc_shares(*),
       poc_responsaveis(*),
       poc_checks(*),
-      poc_history(created_at.desc())
+      poc_history(*)
     `)
     .eq('id', params.id)
     .single()
