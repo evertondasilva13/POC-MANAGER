@@ -41,7 +41,11 @@ export async function GET(req: NextRequest) {
 
   if (approver.aprovado || approver.reprovado) {
     const status = approver.aprovado ? 'aprovado' : 'reprovado'
-    return html(errorPage(`Esta resposta já foi registrada (${status}).`), 400)
+    return html(successPage(
+  status === 'aprovado' ? '✅ Você já aprovou esta POC.' : '❌ Você já reprovou esta POC.',
+  poc?.nome ?? '',
+  false
+), 200)
   }
 
   // Busca dados da POC
