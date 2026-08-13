@@ -1,31 +1,113 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
+import { supabase } from '@/lib/supabase'
+import { getAuthUser, requireAuth } from '@/lib/auth'
+import { sendEmail, buildApprovalEmail } from '@/lib/email'
 
-export async function GET() {
-  const key = process.env.BREVO_API_KEY
-  const from = process.env.EMAIL_FROM
+type Params = { params: { id: string } }
 
-  if (!key) return NextResponse.json({ ok: false, error: 'BREVO_API_KEY não definida' })
-  if (!from) return NextResponse.json({ ok: false, error: 'EMAIL_FROM não definida' })
+const SendSchema = z.object({
+  is_reminder: z.boolean().optional(),
+  approver_id: z.string().uuid().optional(), // se omitido, envia para todos
+})
 
-  try {
-    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: {
-        'accept': 'application/json',
-        'api-key': key,
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        sender: { name: 'POC Manager MTM', email: from },
-        to: [{ name: 'Teste', email: from }],
-        subject: '[TESTE] POC Manager — diagnóstico',
-        htmlContent: '<p>Teste de conectividade Brevo.</p>',
-      }),
-    })
+// POST /api/pocs/[id]/send-approval
+export async function POST(req: NextRequest, { params }: Params) {
+  const user = await getAuthUser(req)
+  const authErr = requireAuth(user)
+  if (authErr) return authErr
 
-    const body = await res.text()
-    return NextResponse.json({ ok: res.ok, status: res.status, brevo_response: body, key_preview: key.slice(-6), from })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message, key_preview: key.slice(-6), from })
+  const body = await req.json().catch(() => ({}))
+  const parsed = SendSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json({ ok: false, error: parsed.error.issues[0].message }, { status: 400 })
   }
+
+  const { is_reminder = false, approver_id } = parsed.data
+
+  const { data: poc, error: pocErr } = await supabase
+    .from('pocs')
+    .select('*, poc_approvers(*)')
+    .eq('id', params.id)
+    .single()
+
+  if (pocErr || !poc) {
+    return NextResponse.json({ ok: false, error: 'POC não encontrada.' }, { status: 404 })
+  }
+
+  let approvers = poc.poc_approvers || []
+  if (approver_id) {
+    approvers = approvers.filter((a: { id: string }) => a.id === approver_id)
+  }
+  if (!is_reminder) {
+    // no envio inicial, filtra apenas os não enviados ainda
+    approvers = approvers.filter((a: { enviado_em: string | null; aprovado: boolean }) => !a.enviado_em && !a.aprovado)
+  }
+
+  if (approvers.length === 0) {
+    return NextResponse.json({ ok: false, error: 'Nenhum aprovador para notificar.' }, { status: 400 })
+  }
+
+  const now = new Date().toISOString()
+  const errors: string[] = []
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://poc-manager-mtm.vercel.app'
+
+  for (const approver of approvers) {
+    const daysPending = approver.enviado_em
+      ? Math.floor((Date.now() - new Date(approver.enviado_em).getTime()) / 86400000)
+      : 0
+
+    try {
+      // Gera token único para este aprovador e armazena no banco
+      const approvalToken = crypto.randomUUID()
+      await supabase
+        .from('poc_approvers')
+        .update({ approval_token: approvalToken, enviado_em: now })
+        .eq('id', approver.id)
+
+      const approveUrl = `${baseUrl}/api/approve?token=${approvalToken}&action=approve`
+      const rejectUrl = `${baseUrl}/api/approve?token=${approvalToken}&action=reject`
+
+      await sendEmail({
+        to: [{ name: approver.nome, email: approver.email }],
+        subject: is_reminder
+          ? `[REMINDER] Aprovação Pendente — ${poc.nome} (${daysPending}d)`
+          : `[POC MTM] Solicitação de Aprovação — ${poc.nome}`,
+        htmlContent: buildApprovalEmail(
+          poc,
+          approver.nome,
+          approveUrl,
+          rejectUrl,
+          is_reminder,
+          daysPending
+        ),
+      })
+    } catch (e) {
+      errors.push(`${approver.email}: ${(e as Error).message}`)
+    }
+  }
+
+  // Primeira vez: avança status para 'approval'
+  if (!is_reminder && poc.status === 'ready') {
+    const newStatusDates = { ...(poc.status_dates || {}), approval: now }
+    await supabase
+      .from('pocs')
+      .update({ status: 'approval', aprovacao_enviada_em: now, status_dates: newStatusDates })
+      .eq('id', params.id)
+  }
+
+  await supabase.from('poc_history').insert({
+    poc_id: params.id,
+    emoji: is_reminder ? '⏰' : '📧',
+    event: is_reminder ? 'Reminder de aprovação enviado' : 'E-mails de aprovação enviados',
+    detail: approvers.map((a: { nome: string; email: string }) => `${a.nome} (${a.email})`).join(', '),
+    by_name: user!.name,
+    by_email: user!.email,
+  })
+
+  if (errors.length > 0) {
+    return NextResponse.json({ ok: false, error: `Alguns e-mails falharam: ${errors.join('; ')}` }, { status: 207 })
+  }
+
+  return NextResponse.json({ ok: true, data: { sent: approvers.length } })
 }
