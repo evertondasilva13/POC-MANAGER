@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
     const status = approver.aprovado ? 'aprovado' : 'reprovado'
     return html(successPage(
   status === 'aprovado' ? '✅ Você já aprovou esta POC.' : '❌ Você já reprovou esta POC.',
-  poc?.nome ?? '',
+  '',
   false
 ), 200)
   }
