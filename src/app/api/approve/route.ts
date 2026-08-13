@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { jwtVerify } from 'jose'
 import { supabase } from '@/lib/supabase'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://poc-manager-mtm.vercel.app'
+const jwtSecret = new TextEncoder().encode(process.env.JWT_SECRET!)
 
-// GET /api/approve?token=UUID&action=approve|reject
-// Endpoint público — autenticado apenas pelo token único do aprovador
+// GET /api/approve?token=JWT&action=approve|reject
+// Endpoint público — autenticado pelo JWT assinado gerado no envio do e-mail
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get('token')
   const action = req.nextUrl.searchParams.get('action')
@@ -13,15 +15,28 @@ export async function GET(req: NextRequest) {
     return html(errorPage('Link inválido.'), 400)
   }
 
-  // Busca aprovador pelo token
+  // Verifica e decodifica o JWT
+  let approverId: string
+  let pocId: string
+  try {
+    const { payload } = await jwtVerify(token, jwtSecret)
+    approverId = payload.approverId as string
+    pocId = payload.pocId as string
+    if (!approverId || !pocId) throw new Error('payload inválido')
+  } catch {
+    return html(errorPage('Link inválido ou expirado.'), 400)
+  }
+
+  // Busca o aprovador pelo ID
   const { data: approver, error } = await supabase
     .from('poc_approvers')
     .select('*')
-    .eq('approval_token', token)
+    .eq('id', approverId)
+    .eq('poc_id', pocId)
     .single()
 
   if (error || !approver) {
-    return html(errorPage('Link não encontrado ou já utilizado.'), 404)
+    return html(errorPage('Aprovador não encontrado.'), 404)
   }
 
   if (approver.aprovado || approver.reprovado) {
@@ -29,25 +44,24 @@ export async function GET(req: NextRequest) {
     return html(errorPage(`Esta resposta já foi registrada (${status}).`), 400)
   }
 
-  // Busca nome da POC
+  // Busca dados da POC
   const { data: poc } = await supabase
     .from('pocs')
     .select('nome, status_dates')
-    .eq('id', approver.poc_id)
+    .eq('id', pocId)
     .single()
 
   const pocNome = poc?.nome ?? ''
   const now = new Date().toISOString()
 
   if (action === 'approve') {
-    // Registra aprovação e invalida o token
     await supabase
       .from('poc_approvers')
-      .update({ aprovado: true, reprovado: false, aprovado_em: now, approval_token: null })
-      .eq('id', approver.id)
+      .update({ aprovado: true, reprovado: false, aprovado_em: now })
+      .eq('id', approverId)
 
     await supabase.from('poc_history').insert({
-      poc_id: approver.poc_id,
+      poc_id: pocId,
       emoji: '✅',
       event: `Aprovado por ${approver.nome}`,
       detail: `${approver.email} · via link de e-mail`,
@@ -55,13 +69,13 @@ export async function GET(req: NextRequest) {
       by_email: approver.email,
     })
 
-    // Verifica se todos aprovaram → avança automaticamente para Homologação
-    // (o SELECT roda após o UPDATE, então já reflete a aprovação atual)
+    // Verifica se todos aprovaram → avança para Homologação
     const { data: allApprovers } = await supabase
       .from('poc_approvers')
       .select('aprovado')
-      .eq('poc_id', approver.poc_id)
+      .eq('poc_id', pocId)
 
+    // Conta a aprovação atual (já commitada acima)
     const allApproved = (allApprovers ?? []).every(a => a.aprovado)
 
     let advanced = false
@@ -70,13 +84,13 @@ export async function GET(req: NextRequest) {
       await supabase
         .from('pocs')
         .update({ status: 'homologacao', status_dates: statusDates })
-        .eq('id', approver.poc_id)
+        .eq('id', pocId)
 
       await supabase.from('poc_history').insert({
-        poc_id: approver.poc_id,
+        poc_id: pocId,
         emoji: '🚀',
         event: 'Todos aprovaram — POC avançou para Homologação automaticamente',
-        detail: 'Aprovação via link de e-mail',
+        detail: 'Via link de e-mail',
         by_name: 'Sistema',
         by_email: 'sistema',
       })
@@ -85,14 +99,13 @@ export async function GET(req: NextRequest) {
 
     return html(successPage('✅ Aprovado com sucesso!', pocNome, advanced), 200)
   } else {
-    // Registra reprovação e invalida o token
     await supabase
       .from('poc_approvers')
-      .update({ reprovado: true, aprovado: false, reprovado_em: now, approval_token: null })
-      .eq('id', approver.id)
+      .update({ reprovado: true, aprovado: false, reprovado_em: now })
+      .eq('id', approverId)
 
     await supabase.from('poc_history').insert({
-      poc_id: approver.poc_id,
+      poc_id: pocId,
       emoji: '❌',
       event: `Reprovado por ${approver.nome}`,
       detail: `${approver.email} · via link de e-mail`,
@@ -100,11 +113,10 @@ export async function GET(req: NextRequest) {
       by_email: approver.email,
     })
 
-    // Volta o card para 'ready' para permitir reenvio
     await supabase
       .from('pocs')
       .update({ status: 'ready' })
-      .eq('id', approver.poc_id)
+      .eq('id', pocId)
 
     return html(successPage('❌ Reprovação registrada.', pocNome, false), 200)
   }
