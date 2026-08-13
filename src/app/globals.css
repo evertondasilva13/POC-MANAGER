@@ -205,9 +205,9 @@ header{background:var(--yellow);height:60px;padding:0 2rem;display:flex;align-it
 
 /* ── KANBAN ── */
 .kanban-toolbar{display:flex;align-items:center;justify-content:space-between;padding:.875rem 1.5rem;flex-wrap:wrap;gap:10px;background:white;border-bottom:1px solid var(--border);position:sticky;top:calc(60px + 130px);z-index:99}
-.kanban-wrapper{padding:1rem 1.5rem 1.5rem;overflow:hidden}
-.kanban-board{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;align-items:start}
-.kanban-col{min-width:0;background:white;border-radius:16px;border:1px solid var(--border);overflow:hidden;display:flex;flex-direction:column}
+.kanban-wrapper{padding:1rem 1.5rem 0;height:calc(100vh - 280px);overflow:hidden}
+.kanban-board{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;height:100%}
+.kanban-col{min-width:0;background:white;border-radius:16px;border:1px solid var(--border);overflow:hidden;display:flex;flex-direction:column;height:100%}
 .kanban-col-header{padding:.875rem 1rem;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
 .kanban-col-header .col-title{font-family:'Raleway',sans-serif;font-size:12px;font-weight:800;letter-spacing:.5px;text-transform:uppercase}
 .kanban-col-header .col-count{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--gray-light);color:var(--gray)}
@@ -217,7 +217,7 @@ header{background:var(--yellow);height:60px;padding:0 2rem;display:flex;align-it
 .kanban-col.homologacao .kanban-col-header{background:var(--purple-light)}.kanban-col.homologacao .col-title{color:var(--purple)}
 .kanban-col.checks .kanban-col-header{background:var(--teal-light)}.kanban-col.checks .col-title{color:var(--teal)}
 .kanban-col.finished .kanban-col-header{background:var(--green-light)}.kanban-col.finished .col-title{color:var(--green-dark)}
-.kanban-cards{padding:.75rem;display:flex;flex-direction:column;gap:10px;min-height:80px;max-height:calc(100vh - 340px);overflow-y:auto}
+.kanban-cards{padding:.75rem;display:flex;flex-direction:column;gap:10px;min-height:0;flex:1;overflow-y:auto}
 .kanban-card{background:white;border-radius:12px;border:1px solid var(--border);padding:.875rem 1rem;cursor:pointer;transition:transform .15s,box-shadow .15s}
 .kanban-card:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(44,62,107,0.1);border-color:var(--blue-mid)}
 .kanban-card-name{font-family:'Raleway',sans-serif;font-size:13px;font-weight:800;color:var(--blue-deeper);margin-bottom:4px;line-height:1.3}
