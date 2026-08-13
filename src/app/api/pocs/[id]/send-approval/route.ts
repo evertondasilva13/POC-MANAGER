@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { SignJWT } from 'jose'
 import { supabase } from '@/lib/supabase'
 import { getAuthUser, requireAuth } from '@/lib/auth'
 import { sendEmail, buildApprovalEmail } from '@/lib/email'
+
+const jwtSecret = new TextEncoder().encode(process.env.JWT_SECRET!)
 
 type Params = { params: { id: string } }
 
@@ -58,15 +61,21 @@ export async function POST(req: NextRequest, { params }: Params) {
       : 0
 
     try {
-      // Gera token único para este aprovador e armazena no banco
-      const approvalToken = crypto.randomUUID()
+      // Gera JWT assinado com o ID do aprovador (válido por 30 dias)
+      const approvalToken = await new SignJWT({ approverId: approver.id, pocId: params.id })
+        .setProtectedHeader({ alg: 'HS256' })
+        .setIssuedAt()
+        .setExpirationTime('30d')
+        .sign(jwtSecret)
+
+      // Atualiza apenas enviado_em (token fica no JWT, não precisa salvar no banco)
       await supabase
         .from('poc_approvers')
-        .update({ approval_token: approvalToken, enviado_em: now })
+        .update({ enviado_em: now })
         .eq('id', approver.id)
 
-      const approveUrl = `${baseUrl}/api/approve?token=${approvalToken}&action=approve`
-      const rejectUrl = `${baseUrl}/api/approve?token=${approvalToken}&action=reject`
+      const approveUrl = `${baseUrl}/api/approve?token=${encodeURIComponent(approvalToken)}&action=approve`
+      const rejectUrl = `${baseUrl}/api/approve?token=${encodeURIComponent(approvalToken)}&action=reject`
 
       await sendEmail({
         to: [{ name: approver.nome, email: approver.email }],
