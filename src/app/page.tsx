@@ -439,7 +439,7 @@ export default function PocManagerApp() {
         {key:'finished', label:lang==='pt'?'Finalizado':'Finalizado', emoji:'✅'},
       ]
       let html = `
-      <div class="hero"><div class="hero-inner">
+      <div class="hero hero-sticky"><div class="hero-inner">
         <div>
           <div class="hero-eyebrow">${t('hero_eyebrow')}</div>
           <h1>${t('hero_title')}</h1>
@@ -451,11 +451,11 @@ export default function PocManagerApp() {
           <div class="stat-chip"><div class="stat-num">${finished}</div><div class="stat-label">${t('stat_finished')}</div></div>
         </div>
       </div></div>
-      <div class="container">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:10px">
-          <div class="section-title" style="margin-bottom:0;flex:1">${lang==='pt'?'Quadro de POCs':'Tablero de POCs'}</div>
-          <button class="btn btn-primary" onclick="window._poc.navigate('create')">${t('btn_new')}</button>
-        </div>`
+      <div class="kanban-toolbar">
+        <div class="section-title" style="margin-bottom:0;flex:1">${lang==='pt'?'Quadro de POCs':'Tablero de POCs'}</div>
+        <button class="btn btn-primary" onclick="window._poc.navigate('create')">${t('btn_new')}</button>
+      </div>
+      <div class="kanban-wrapper">`
       if (allVisible.length === 0) {
         html += `<div class="empty-state"><div class="empty-icon">🧪</div><h3>${t('empty_title')}</h3><p>${t('empty_msg')}</p><button class="btn btn-primary" onclick="window._poc.navigate('create')">${t('btn_new')}</button></div>`
       } else {
@@ -549,29 +549,29 @@ export default function PocManagerApp() {
     }
 
     async function advanceToApproval(cardId: string) {
-  const d = gatherFormData()
-  if (!d.nome || !d.descricao || !d.kpi_chave) { toast(lang==='pt'?'Preencha Nome, Descrição e KPI.':'Completa Nombre, Descripción y KPI.', 'error'); return }
-  if (!d.resultado || !d.link_apresentacao) { toast(t('missing_fields'), 'error'); return }
-  showLoading()
-  let savedId = cardId
-  if (cardId) {
-    const res = await api('PUT', `/api/pocs/${cardId}`, d)
-    if (!res.ok) { hideLoading(); toast(res.error || 'Erro ao salvar.', 'error'); return }
-  } else {
-    const res = await api('POST', '/api/pocs', d)
-    if (!res.ok) { hideLoading(); toast(res.error || 'Erro ao criar.', 'error'); return }
-    savedId = res.data.id
-    editingCardId = savedId
-  }
-  const advRes = await api('POST', `/api/pocs/${savedId}/advance`, { action: 'ready' })
-  hideLoading()
-  if (!advRes.ok) {
-    toast(advRes.error || 'Erro ao avançar status.', 'error')
-    await navigate('edit', savedId)
-    return
-  }
-  await navigate('approval', savedId)
-}
+      const d = gatherFormData()
+      if (!d.nome || !d.descricao || !d.kpi_chave) { toast(lang==='pt'?'Preencha Nome, Descrição e KPI.':'Completa Nombre, Descripción y KPI.', 'error'); return }
+      if (!d.resultado || !d.link_apresentacao) { toast(t('missing_fields'), 'error'); return }
+      showLoading()
+      let savedId = cardId
+      if (cardId) {
+        const res = await api('PUT', `/api/pocs/${cardId}`, d)
+        if (!res.ok) { hideLoading(); toast(res.error || 'Erro ao salvar.', 'error'); return }
+      } else {
+        const res = await api('POST', '/api/pocs', d)
+        if (!res.ok) { hideLoading(); toast(res.error || 'Erro ao criar.', 'error'); return }
+        savedId = res.data.id
+        editingCardId = savedId  // evita duplicatas se o usuário clicar novamente
+      }
+      const advRes = await api('POST', `/api/pocs/${savedId}/advance`, { action: 'ready' })
+      hideLoading()
+      if (!advRes.ok) {
+        toast(advRes.error || 'Erro ao avançar status.', 'error')
+        await navigate('edit', savedId)  // vai para edição (não cria novo card se clicar de novo)
+        return
+      }
+      await navigate('approval', savedId)
+    }
 
     // ── DETAIL VIEW
     function renderDetail(cardId: string) {
