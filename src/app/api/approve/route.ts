@@ -56,18 +56,13 @@ export async function GET(req: NextRequest) {
     })
 
     // Verifica se todos aprovaram → avança automaticamente para Homologação
+    // (o SELECT roda após o UPDATE, então já reflete a aprovação atual)
     const { data: allApprovers } = await supabase
       .from('poc_approvers')
-      .select('aprovado, reprovado')
+      .select('aprovado')
       .eq('poc_id', approver.poc_id)
 
-    // Inclui a aprovação que acabamos de registrar (ainda não refletiu no select)
-    const approversUpdated = (allApprovers ?? []).map(a =>
-      a === allApprovers?.find(x => !x.aprovado && !x.reprovado) ? { ...a, aprovado: true } : a
-    )
-    const allApproved = (allApprovers ?? []).every(
-      a => (a.aprovado) || (a.id === approver.id)
-    )
+    const allApproved = (allApprovers ?? []).every(a => a.aprovado)
 
     let advanced = false
     if (allApproved) {
