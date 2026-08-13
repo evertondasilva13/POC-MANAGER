@@ -50,6 +50,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const now = new Date().toISOString()
   const errors: string[] = []
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://poc-manager-mtm.vercel.app'
 
   for (const approver of approvers) {
     const daysPending = approver.enviado_em
@@ -57,6 +58,16 @@ export async function POST(req: NextRequest, { params }: Params) {
       : 0
 
     try {
+      // Gera token único para este aprovador e armazena no banco
+      const approvalToken = crypto.randomUUID()
+      await supabase
+        .from('poc_approvers')
+        .update({ approval_token: approvalToken, enviado_em: now })
+        .eq('id', approver.id)
+
+      const approveUrl = `${baseUrl}/api/approve?token=${approvalToken}&action=approve`
+      const rejectUrl = `${baseUrl}/api/approve?token=${approvalToken}&action=reject`
+
       await sendEmail({
         to: [{ name: approver.nome, email: approver.email }],
         subject: is_reminder
@@ -65,17 +76,12 @@ export async function POST(req: NextRequest, { params }: Params) {
         htmlContent: buildApprovalEmail(
           poc,
           approver.nome,
-          poc.created_by_email,
+          approveUrl,
+          rejectUrl,
           is_reminder,
           daysPending
         ),
       })
-
-      // Atualiza enviado_em do aprovador
-      await supabase
-        .from('poc_approvers')
-        .update({ enviado_em: now })
-        .eq('id', approver.id)
     } catch (e) {
       errors.push(`${approver.email}: ${(e as Error).message}`)
     }
