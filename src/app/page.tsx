@@ -549,23 +549,29 @@ export default function PocManagerApp() {
     }
 
     async function advanceToApproval(cardId: string) {
-      const d = gatherFormData()
-      if (!d.nome || !d.descricao || !d.kpi_chave) { toast(lang==='pt'?'Preencha Nome, Descrição e KPI.':'Completa Nombre, Descripción y KPI.', 'error'); return }
-      if (!d.resultado || !d.link_apresentacao) { toast(t('missing_fields'), 'error'); return }
-      showLoading()
-      let savedId = cardId
-      if (cardId) {
-        await api('PUT', `/api/pocs/${cardId}`, d)
-      } else {
-        const res = await api('POST', '/api/pocs', d)
-        if (!res.ok) { hideLoading(); toast(res.error || 'Erro ao salvar.', 'error'); return }
-        savedId = res.data.id
-      }
-      const advRes = await api('POST', `/api/pocs/${savedId}/advance`, { action: 'ready' })
-      hideLoading()
-      if (!advRes.ok) { toast(advRes.error || 'Erro ao avançar status.', 'error'); return }
-      await navigate('approval', savedId)
-    }
+  const d = gatherFormData()
+  if (!d.nome || !d.descricao || !d.kpi_chave) { toast(lang==='pt'?'Preencha Nome, Descrição e KPI.':'Completa Nombre, Descripción y KPI.', 'error'); return }
+  if (!d.resultado || !d.link_apresentacao) { toast(t('missing_fields'), 'error'); return }
+  showLoading()
+  let savedId = cardId
+  if (cardId) {
+    const res = await api('PUT', `/api/pocs/${cardId}`, d)
+    if (!res.ok) { hideLoading(); toast(res.error || 'Erro ao salvar.', 'error'); return }
+  } else {
+    const res = await api('POST', '/api/pocs', d)
+    if (!res.ok) { hideLoading(); toast(res.error || 'Erro ao criar.', 'error'); return }
+    savedId = res.data.id
+    editingCardId = savedId
+  }
+  const advRes = await api('POST', `/api/pocs/${savedId}/advance`, { action: 'ready' })
+  hideLoading()
+  if (!advRes.ok) {
+    toast(advRes.error || 'Erro ao avançar status.', 'error')
+    await navigate('edit', savedId)
+    return
+  }
+  await navigate('approval', savedId)
+}
 
     // ── DETAIL VIEW
     function renderDetail(cardId: string) {
