@@ -10,8 +10,8 @@
   --red:#C0392B;--red-light:#FDEDEC;
   --bg:#EDEAE3;
 }
-html,body{height:100vh;overflow:hidden}
-body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text)}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+body.dashboard-open{overflow:hidden;height:100vh}
 
 /* ── HEADER ── */
 header{background:var(--yellow);height:60px;padding:0 2rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200;border-bottom:2px solid var(--yellow-dark)}
