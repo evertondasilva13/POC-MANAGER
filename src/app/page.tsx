@@ -952,30 +952,6 @@ export default function PocManagerApp() {
             ${checkItemImage('paginaMTMPlaybook','🌐',t('check_pagina_playbook'),t('check_pagina_playbook_desc'))}
           </div>
         </div>
-        <div class="panel">
-          <div class="panel-header"><h3>👔 ${t('section_supervisor')}</h3></div>
-          <div class="panel-body">
-            <div class="form-row">
-              <div>
-                <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--gray);margin-bottom:8px">${t('sup_label')}</div>
-                <div class="form-row" style="gap:8px">
-                  <div class="form-group"><label>${t('sup_name')}</label><input type="text" id="sup-name" value="${esc(sup.nome||'')}" placeholder="${t('sup_name')}"></div>
-                  <div class="form-group"><label>${t('sup_email')}</label><input type="email" id="sup-email" value="${esc(sup.email||'')}" placeholder="email@..."></div>
-                </div>
-              </div>
-              <div>
-                <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--gray);margin-bottom:8px">${t('ger_label')}</div>
-                <div class="form-row" style="gap:8px">
-                  <div class="form-group"><label>${t('sup_name')}</label><input type="text" id="ger-name" value="${esc(ger.nome||'')}" placeholder="${t('sup_name')}"></div>
-                  <div class="form-group"><label>${t('sup_email')}</label><input type="email" id="ger-email" value="${esc(ger.email||'')}" placeholder="email@..."></div>
-                </div>
-              </div>
-            </div>
-            <div class="info-bar" style="margin-top:1rem">${t('reminder_info')}</div>
-            ${showReminder ? `<div class="warn-bar">⚠️ ${lang==='pt'?`Já fazem ${daysSent} dias desde o último envio.`:`Ya han pasado ${daysSent} días desde el último envío.`}</div>` : ''}
-            <button class="btn btn-orange" onclick="window._poc.sendChecksReminder('${cardId}')">${t('btn_send_reminder')}</button>
-          </div>
-        </div>
         ${done ? `<div class="info-bar"><span class="info-icon">🎉</span>${t('all_checks_done')}</div><button class="btn btn-green" style="width:100%;justify-content:center;font-size:15px;padding:14px" onclick="window._poc.finalizeCard('${cardId}')">${t('btn_finalize')}</button>` : ''}
       </div>`
     }
