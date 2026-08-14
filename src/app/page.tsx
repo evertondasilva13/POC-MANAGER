@@ -833,11 +833,11 @@ export default function PocManagerApp() {
 
     function gatherResponsaveis() {
       const roles = ['SHE','Compras','Operacao','Lean','MTM']
-      const resp: any = {}
+      const resp: any[] = []
       roles.forEach(role => {
         const n = (document.getElementById('h-name-' + role) as HTMLInputElement)?.value.trim() || ''
         const e = (document.getElementById('h-email-' + role) as HTMLInputElement)?.value.trim() || ''
-        if (n || e) resp[role] = { nome: n, email: e }
+        if (n && e) resp.push({ role, nome: n, email: e })
       })
       return resp
     }
