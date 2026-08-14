@@ -94,7 +94,7 @@ export interface PocResponsavel {
 }
 
 // ─── Checks ──────────────────────────────────────────────────────────────────
-export type CheckKey = 'checklist' | 'playbook' | 'catalogo' | 'paginaMTM'
+export type CheckKey = 'checklist' | 'playbook' | 'catalogo' | 'paginaMTMChecklist' | 'paginaMTMPlaybook'
 
 export interface PocCheck {
   id: string
