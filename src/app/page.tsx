@@ -364,7 +364,13 @@ export default function PocManagerApp() {
     async function navigate(view: string, cardId?: string) {
       currentView = view
       editingCardId = cardId || null
-      window.scrollTo(0, 0)
+      // Lock page scroll only on dashboard (kanban), free it on all other views
+      if (view === 'dashboard') {
+        document.body.classList.add('dashboard-open')
+      } else {
+        document.body.classList.remove('dashboard-open')
+        window.scrollTo(0, 0)
+      }
       showLoading()
       if (view === 'dashboard') {
         await loadCardsFromAPI()
@@ -394,6 +400,12 @@ export default function PocManagerApp() {
       const app = document.getElementById('app')
       if (!app) return
       applyI18nStatic()
+      // Sync body class with current view
+      if (currentView === 'dashboard') {
+        document.body.classList.add('dashboard-open')
+      } else {
+        document.body.classList.remove('dashboard-open')
+      }
       if (currentView === 'dashboard') app.innerHTML = renderDashboard()
       else if (currentView === 'create') app.innerHTML = renderCreateEdit(null)
       else if (currentView === 'edit') app.innerHTML = renderCreateEdit(editingCardId)
