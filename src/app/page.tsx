@@ -575,7 +575,7 @@ export default function PocManagerApp() {
         savedId = res.data.id
         editingCardId = savedId  // evita duplicatas se o usuário clicar novamente
       }
-      const advRes = await api('POST', `/api/pocs/${savedId}/advance`, { action: 'ready' })
+      const advRes = await api('POST', `/api/pocs/${savedId}/advance`, { to: 'ready' })
       hideLoading()
       if (!advRes.ok) {
         toast(advRes.error || 'Erro ao avançar status.', 'error')
@@ -789,7 +789,7 @@ export default function PocManagerApp() {
 
     async function advanceToHomologacao(cardId: string) {
       showLoading()
-      const res = await api('POST', `/api/pocs/${cardId}/advance`, { action: 'homologacao' })
+      const res = await api('POST', `/api/pocs/${cardId}/advance`, { to: 'homologacao' })
       hideLoading()
       if (!res.ok) { toast(res.error || 'Erro ao avançar.', 'error'); return }
       await navigate('homologacao', cardId)
@@ -854,7 +854,7 @@ export default function PocManagerApp() {
 
     async function advanceToChecks(cardId: string) {
       showLoading()
-      const res = await api('POST', `/api/pocs/${cardId}/advance`, { action: 'checks' })
+      const res = await api('POST', `/api/pocs/${cardId}/advance`, { to: 'checks' })
       hideLoading()
       if (!res.ok) { toast(res.error || 'Erro ao avançar.', 'error'); return }
       await navigate('checks', cardId)
@@ -966,7 +966,7 @@ export default function PocManagerApp() {
       const card = getCard(cardId)
       if (!card || !allChecksDone(card)) { toast(lang==='pt'?'Conclua todos os checks primeiro.':'Completa todos los checks primero.', 'error'); return }
       showLoading()
-      const res = await api('POST', `/api/pocs/${cardId}/advance`, { action: 'finished' })
+      const res = await api('POST', `/api/pocs/${cardId}/advance`, { to: 'finished' })
       hideLoading()
       if (!res.ok) { toast(res.error || 'Erro ao finalizar.', 'error'); return }
       toast(lang==='pt'?'🏆 POC finalizada com sucesso!':'🏆 ¡POC finalizado con éxito!', 'success')
