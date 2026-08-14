@@ -2,7 +2,22 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { supabase } from '@/lib/supabase'
 import { getAuthUser, requireAuth } from '@/lib/auth'
+import { sendEmail, buildFinalizationEmail } from '@/lib/email'
 import type { PocStatus } from '@/types'
+
+const FINALIZATION_RECIPIENTS = [
+  { name: 'Letícia Ferreira', email: 'leticia.bferreira@mercadolivre.com' },
+  { name: 'Lívia Campagnaro', email: 'livia.campagnaro@mercadolibre.com.mx' },
+  { name: 'Marina Heck', email: 'marina.heck@mercadolivre.com' },
+]
+
+const CHECK_LABELS: Record<string, string> = {
+  checklist: 'Criação de Checklist',
+  playbook: 'Playbook',
+  catalogo: 'Catálogo',
+  paginaMTMChecklist: 'Página MTM — Checklist',
+  paginaMTMPlaybook: 'Página MTM — Playbook',
+}
 
 type Params = { params: { id: string } }
 
@@ -55,7 +70,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   // Validações por status destino
   if (to === 'finished') {
     const checks = poc.poc_checks || []
-    const allDone = ['checklist', 'playbook', 'catalogo', 'paginaMTM'].every(
+    const allDone = ['checklist', 'playbook', 'catalogo', 'paginaMTMChecklist', 'paginaMTMPlaybook'].every(
       (k) => checks.find((c: { key: string; done: boolean }) => c.key === k)?.done
     )
     if (!allDone) {
@@ -96,6 +111,26 @@ export async function POST(req: NextRequest, { params }: Params) {
     .single()
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+
+  // E-mail automático de finalização para equipe MTM
+  if (to === 'finished') {
+    try {
+      const checks = (poc.poc_checks || []).map((c: { key: string; link: string | null }) => ({
+        key: c.key,
+        label: CHECK_LABELS[c.key] || c.key,
+        link: c.link,
+      }))
+
+      await sendEmail({
+        to: FINALIZATION_RECIPIENTS,
+        subject: `[POC MTM] POC Finalizada — ${poc.nome}`,
+        htmlContent: buildFinalizationEmail(poc, checks, user!.name),
+      })
+    } catch (e) {
+      // Não bloqueia a finalização se o e-mail falhar
+      console.error('Erro ao enviar e-mail de finalização:', e)
+    }
+  }
 
   await supabase.from('poc_history').insert({
     poc_id: params.id,
