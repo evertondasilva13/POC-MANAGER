@@ -334,10 +334,28 @@ export default function PocManagerApp() {
       const nameEl = document.getElementById('user-name-display')
       const dashBtn = document.getElementById('btn-nav-dashboard')
       const adminChip = document.getElementById('admin-chip')
+      const logoutBtn = document.getElementById('btn-logout')
       if (chip) chip.style.display = 'flex'
       if (nameEl) nameEl.textContent = currentUser?.name || ''
       if (dashBtn) dashBtn.style.display = 'inline-flex'
       if (adminChip) adminChip.style.display = currentUser?.is_admin ? 'flex' : 'none'
+      if (logoutBtn) logoutBtn.style.display = 'inline-flex'
+    }
+    function doLogout() {
+      localStorage.removeItem(TOKEN_KEY)
+      localStorage.removeItem(USER_KEY_ST)
+      token = null
+      currentUser = null
+      isAdmin = false
+      const chip = document.getElementById('user-chip')
+      const dashBtn = document.getElementById('btn-nav-dashboard')
+      const adminChip = document.getElementById('admin-chip')
+      const logoutBtn = document.getElementById('btn-logout')
+      if (chip) chip.style.display = 'none'
+      if (dashBtn) dashBtn.style.display = 'none'
+      if (adminChip) adminChip.style.display = 'none'
+      if (logoutBtn) logoutBtn.style.display = 'none'
+      openModal('modal-login')
     }
 
     // ── AUTH
@@ -1101,7 +1119,7 @@ export default function PocManagerApp() {
 
     // ── EXPOSE GLOBALLY (for onclick handlers)
     ;(window as any)._poc = {
-      navigate, doLogin, toggleLang, toggleAdmin, closeModal, openModal,
+      navigate, doLogin, doLogout, toggleLang, toggleAdmin, closeModal, openModal,
       saveCard, advanceToApproval, confirmDelete, openDeleteModal,
       openShareModal, addShareUser, removeShare, saveShare,
       addApprover, toggleApproverForm, markApproved, markRejected,
@@ -1167,6 +1185,7 @@ export default function PocManagerApp() {
           <div className="user-chip" id="user-chip" style={{display:'none'}}>
             <span>👤</span> <strong id="user-name-display"></strong>
           </div>
+          <button className="btn-header" id="btn-logout" onClick={() => (window as any)._poc?.doLogout()} style={{display:'none'}} title="Sair da conta">🚪 Sair</button>
           <button className="btn-header primary" onClick={() => (window as any)._poc?.navigate('dashboard')} id="btn-nav-dashboard" style={{display:'none'}} data-i18n="nav_dashboard">Dashboard</button>
           <span className="badge-header">POC</span>
         </div>
