@@ -670,7 +670,11 @@ export default function PocManagerApp() {
       if (!card) return '<div class="container"><p>POC não encontrada.</p></div>'
       const sent = card.aprovacaoEnviadaEm
       const approved = allApproved(card)
-      const hasRejection = [...(card.aprovadoresOperacao||[]), ...(card.aprovadoresSHE||[])].some((a: any) => a.reprovado)
+      const allApprovers = [...(card.aprovadoresOperacao||[]), ...(card.aprovadoresSHE||[])]
+      const hasRejection = allApprovers.some((a: any) => a.reprovado)
+      // Mostra botão de envio se nunca enviou OU se há aprovadores cujo enviado_em foi resetado
+      const hasUnsent = allApprovers.some((a: any) => !a.enviado_em && !a.aprovado)
+      const canSend = !sent || hasUnsent
 
       const renderApproverRows = (type: string) => {
         const list = type === 'op' ? card.aprovadoresOperacao : card.aprovadoresSHE
@@ -722,7 +726,7 @@ export default function PocManagerApp() {
         <div class="panel"><div class="panel-header"><h3>👷 ${t('section_approvers_op')}</h3></div><div class="panel-body">${renderApproverRows('op')}</div></div>
         <div class="panel"><div class="panel-header"><h3>🦺 ${t('section_approvers_she')}</h3></div><div class="panel-body">${renderApproverRows('she')}</div></div>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
-          ${!sent ? `<button class="btn btn-primary" onclick="window._poc.sendApprovalEmails('${cardId}')">${t('btn_send_approval')}</button>` : ''}
+          ${canSend && !hasRejection ? `<button class="btn btn-primary" onclick="window._poc.sendApprovalEmails('${cardId}')">${t('btn_send_approval')}</button>` : ''}
           ${sent && approved ? `<div class="info-bar" style="margin-bottom:0;flex:1">${t('all_approved')}</div><button class="btn btn-green" onclick="window._poc.advanceToHomologacao('${cardId}')">${t('btn_next_homolog')}</button>` : ''}
         </div>
       </div>`
