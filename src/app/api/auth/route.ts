@@ -24,12 +24,36 @@ export async function POST(req: NextRequest) {
 
   const { name, email } = parsed.data
 
-  // Upsert: cria ou retorna usuário existente
-  const { data: user, error } = await supabase
+  // Tenta buscar usuário existente pelo e-mail
+  const { data: existing } = await supabase
     .from('users')
-    .upsert({ name, email }, { onConflict: 'email', ignoreDuplicates: false })
     .select()
+    .eq('email', email)
     .single()
+
+  let user: any
+  let error: any
+
+  if (existing) {
+    // Atualiza apenas o nome, preserva is_admin
+    const { data: updated, error: updateErr } = await supabase
+      .from('users')
+      .update({ name })
+      .eq('email', email)
+      .select()
+      .single()
+    user = updated
+    error = updateErr
+  } else {
+    // Cria novo usuário (is_admin padrão = false)
+    const { data: created, error: insertErr } = await supabase
+      .from('users')
+      .insert({ name, email, is_admin: false })
+      .select()
+      .single()
+    user = created
+    error = insertErr
+  }
 
   if (error || !user) {
     console.error('[auth] supabase error:', error)
