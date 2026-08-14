@@ -6,7 +6,7 @@ import { getAuthUser, requireAuth } from '@/lib/auth'
 type Params = { params: { id: string } }
 
 const CheckSchema = z.object({
-  key: z.enum(['checklist', 'playbook', 'catalogo', 'paginaMTM']),
+  key: z.enum(['checklist', 'playbook', 'catalogo', 'paginaMTMChecklist', 'paginaMTMPlaybook']),
   done: z.boolean(),
   link: z.string().optional(),
   arquivo_url: z.string().optional(),
