@@ -78,13 +78,14 @@ export default function PocManagerApp() {
         check_checklist:'Criação de Checklist', check_checklist_desc:'Adicione o link do checklist criado',
         check_playbook:'Playbook', check_playbook_desc:'Adicione o link do playbook',
         check_catalogo:'Catálogo', check_catalogo_desc:'Adicione o link do catálogo',
-        check_pagina:'Página MTM', check_pagina_desc:'Adicione o link da página MTM',
+        check_pagina_checklist:'Página MTM — Checklist', check_pagina_checklist_desc:'Print de que o checklist já está publicado na Página MTM',
+        check_pagina_playbook:'Página MTM — Playbook', check_pagina_playbook_desc:'Print de que o playbook já está publicado na Página MTM',
         check_ph_link:'https://',
         btn_check_save:'Salvar',
         section_supervisor:'Supervisor e Gerente MTM',
         sup_name:'Nome', sup_email:'E-mail',
         sup_label:'Supervisor MTM', ger_label:'Gerente MTM',
-        btn_send_reminder:'Enviar reminder pós-homologação',
+        btn_send_reminder:'Notificar equipe MTM',
         reminder_info:'Reminders serão enviados a cada 5 dias até todos os checks serem concluídos.',
         all_checks_done:'✅ Todos os checks concluídos! Finalize a POC.',
         btn_finalize:'Finalizar POC ✓',
@@ -150,13 +151,14 @@ export default function PocManagerApp() {
         check_checklist:'Creación de Checklist', check_checklist_desc:'Agrega el link del checklist creado',
         check_playbook:'Playbook', check_playbook_desc:'Agrega el link del playbook',
         check_catalogo:'Catálogo', check_catalogo_desc:'Agrega el link del catálogo',
-        check_pagina:'Página MTM', check_pagina_desc:'Agrega el link de la página MTM',
+        check_pagina_checklist:'Página MTM — Checklist', check_pagina_checklist_desc:'Print de que el checklist ya está publicado en la Página MTM',
+        check_pagina_playbook:'Página MTM — Playbook', check_pagina_playbook_desc:'Print de que el playbook ya está publicado en la Página MTM',
         check_ph_link:'https://',
         btn_check_save:'Guardar',
         section_supervisor:'Supervisor y Gerente MTM',
         sup_name:'Nombre', sup_email:'E-mail',
         sup_label:'Supervisor MTM', ger_label:'Gerente MTM',
-        btn_send_reminder:'Enviar reminder post-homologación',
+        btn_send_reminder:'Notificar equipo MTM',
         reminder_info:'Los reminders se enviarán cada 5 días hasta completar todos los checks.',
         all_checks_done:'✅ ¡Todos los checks completados! Finaliza el POC.',
         btn_finalize:'Finalizar POC ✓',
@@ -196,7 +198,7 @@ export default function PocManagerApp() {
     }
     function allChecksDone(card: any) {
       const ch = card.checks || {}
-      return ['checklist','playbook','catalogo','paginaMTM'].every(k => ch[k] && ch[k].done)
+      return ['checklist','playbook','catalogo','paginaMTMChecklist','paginaMTMPlaybook'].every(k => ch[k] && ch[k].done)
     }
     function statusLabel(s: string) { return t('status_' + s) || s }
     function statusDot(s: string) {
@@ -908,7 +910,8 @@ export default function PocManagerApp() {
             ${checkItem('checklist','📋',t('check_checklist'),t('check_checklist_desc'))}
             ${checkItem('playbook','📚',t('check_playbook'),t('check_playbook_desc'))}
             ${checkItem('catalogo','🗂️',t('check_catalogo'),t('check_catalogo_desc'))}
-            ${checkItem('paginaMTM','🌐',t('check_pagina'),t('check_pagina_desc'))}
+            ${checkItem('paginaMTMChecklist','🌐',t('check_pagina_checklist'),t('check_pagina_checklist_desc'))}
+            ${checkItem('paginaMTMPlaybook','🌐',t('check_pagina_playbook'),t('check_pagina_playbook_desc'))}
           </div>
         </div>
         <div class="panel">
