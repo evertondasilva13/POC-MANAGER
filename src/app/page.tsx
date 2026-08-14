@@ -693,7 +693,7 @@ export default function PocManagerApp() {
             </div>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
               <span class="status-pill ${stClass}" style="${a.reprovado?'background:var(--red-light);color:var(--red);border-color:rgba(192,57,43,0.2)':''}">${stLabel}</span>
-              ${!a.aprovado && !a.reprovado ? `
+              ${!a.aprovado && !a.reprovado && isAdmin ? `
                 <button class="btn btn-sm btn-green" onclick="window._poc.markApproved('${cardId}','${a.id}')">${t('mark_approved')}</button>
                 <button class="btn btn-sm btn-red" onclick="window._poc.markRejected('${cardId}','${a.id}')">${lang==='pt'?'✗ Reprovar':'✗ Reprobar'}</button>` : ''}
             </div>
