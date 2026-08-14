@@ -188,7 +188,63 @@ export function buildHomologacaoEmail(poc: PocEmailData): string {
   </div>`
 }
 
-// ─── 3. Reminder pós-homologação ──────────────────────────────────────────
+// ─── 3. E-mail de Finalização (para Letícia, Lívia e Marina) ─────────────
+export interface CheckItem {
+  key: string
+  label: string
+  link?: string | null
+}
+
+export function buildFinalizationEmail(
+  poc: PocEmailData,
+  checks: CheckItem[],
+  finalizadoPor: string
+): string {
+  const checkRows = checks.map(c =>
+    `<tr>
+      <td style="padding:8px 12px;border-bottom:1px solid #EBEBEB;font-size:13px;color:#333">✅ ${c.label}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #EBEBEB;font-size:13px">
+        ${c.link ? `<a href="${c.link}" style="color:#2C3E6B;word-break:break-all">${c.link}</a>` : '<span style="color:#aaa">—</span>'}
+      </td>
+    </tr>`
+  ).join('')
+
+  return `
+  <div style="${baseStyle}">
+    <div style="${headerStyle}">
+      <div style="background:#2E7D5E;color:#fff;font-size:11px;font-weight:700;letter-spacing:1px;padding:4px 12px;border-radius:20px;display:inline-block;margin-bottom:10px">🏆 POC FINALIZADA</div>
+      <div style="font-size:20px;font-weight:900;color:#F5E97A;font-family:Raleway,Arial,sans-serif">
+        POC Concluída com Sucesso!
+      </div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.65);margin-top:4px">POC Manager MTM — Mercado Livre</div>
+    </div>
+    <div style="${bodyStyle}">
+      <p style="font-size:14px;margin-top:0">Olá equipe MTM,</p>
+      <p style="font-size:13px;color:#555;line-height:1.6">
+        A seguinte POC foi <b>finalizada com sucesso</b> por <b>${finalizadoPor}</b> e todos os itens do checklist pós-homologação foram concluídos:
+      </p>
+      ${pocInfoBlock(poc)}
+      <p style="font-size:13px;font-weight:700;color:#1E2D52;margin-bottom:8px">Checklist Pós-Homologação:</p>
+      <table style="width:100%;border-collapse:collapse;border:1px solid #EBEBEB;border-radius:8px;overflow:hidden">
+        <thead>
+          <tr style="background:#F5F5F0">
+            <th style="padding:10px 12px;font-size:12px;color:#717171;text-align:left;font-weight:700">Item</th>
+            <th style="padding:10px 12px;font-size:12px;color:#717171;text-align:left;font-weight:700">Link / Evidência</th>
+          </tr>
+        </thead>
+        <tbody>${checkRows}</tbody>
+      </table>
+      <p style="font-size:13px;color:#555;line-height:1.6;margin-top:16px">
+        Esta é uma notificação automática de visibilidade. Nenhuma ação é necessária.
+      </p>
+    </div>
+    <div style="${footerStyle}">
+      POC Manager MTM — Mercado Livre &bull; Este e-mail foi gerado automaticamente na finalização da POC.
+    </div>
+  </div>`
+}
+
+// ─── 4. Reminder pós-homologação ──────────────────────────────────────────
 export function buildChecksReminderEmail(
   poc: PocEmailData,
   pendingItems: string[],
