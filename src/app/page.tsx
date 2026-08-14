@@ -900,6 +900,44 @@ export default function PocManagerApp() {
         </div>`
       }
 
+      // Versão com upload/paste de imagem (para Página MTM)
+      const checkItemImage = (key: string, icon: string, label: string, desc: string) => {
+        const item = ch[key] || {}
+        const isDone = !!item.done
+        const editId = `check-editing-${key}`
+        const hasImage = item.arquivo_url && item.arquivo_url.startsWith('data:image')
+        return `<div class="check-item ${isDone ? 'done' : ''}">
+          <div class="check-box">${isDone ? '✓' : ''}</div>
+          <div class="check-label"><strong>${icon} ${label}</strong><p>${desc}</p></div>
+          <div class="check-action" style="flex-wrap:wrap;gap:6px;flex:1">
+            <div id="${editId}" style="display:${isDone?'none':'flex'};flex-direction:column;gap:8px;width:100%">
+              <div
+                id="paste-zone-${key}"
+                tabindex="0"
+                onpaste="window._poc.handleCheckPaste(event,'${cardId}','${key}')"
+                onclick="document.getElementById('file-input-${key}').click()"
+                style="border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;cursor:pointer;background:var(--gray-light);font-size:13px;color:var(--gray);transition:border-color .15s"
+                onmouseenter="this.style.borderColor='var(--blue-mid)'"
+                onmouseleave="this.style.borderColor='var(--border)'">
+                📋 Cole o print aqui (<b>Ctrl+V</b>) ou clique para selecionar arquivo
+              </div>
+              <input type="file" id="file-input-${key}" accept="image/*" style="display:none" onchange="window._poc.handleCheckFile(event,'${cardId}','${key}')">
+              <div id="img-preview-${key}" style="display:none;margin-top:4px">
+                <img id="img-el-${key}" src="" style="max-width:100%;max-height:200px;border-radius:8px;border:1px solid var(--border)">
+                <button class="btn btn-green btn-sm" style="margin-top:8px" onclick="window._poc.saveCheckImage('${cardId}','${key}')">${t('btn_check_save')}</button>
+              </div>
+            </div>
+            ${isDone ? `<div style="display:flex;flex-direction:column;gap:8px;width:100%">
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="font-size:20px">✅</span>
+                <button class="btn btn-ghost btn-sm" onclick="document.getElementById('${editId}').style.display='flex';document.getElementById('${editId}').previousElementSibling && (document.getElementById('${editId}').style.display='flex')" style="font-size:11px;padding:5px 10px">✏️ ${lang==='pt'?'Trocar imagem':'Cambiar imagen'}</button>
+              </div>
+              ${hasImage ? `<img src="${item.arquivo_url}" style="max-width:100%;max-height:160px;border-radius:8px;border:1px solid var(--border);object-fit:contain">` : ''}
+            </div>` : ''}
+          </div>
+        </div>`
+      }
+
       return `
       <div class="container">
         <div class="detail-back" onclick="window._poc.navigate('homologacao','${cardId}')">&larr; ${t('step_homolog')}</div>
@@ -910,8 +948,8 @@ export default function PocManagerApp() {
             ${checkItem('checklist','📋',t('check_checklist'),t('check_checklist_desc'))}
             ${checkItem('playbook','📚',t('check_playbook'),t('check_playbook_desc'))}
             ${checkItem('catalogo','🗂️',t('check_catalogo'),t('check_catalogo_desc'))}
-            ${checkItem('paginaMTMChecklist','🌐',t('check_pagina_checklist'),t('check_pagina_checklist_desc'))}
-            ${checkItem('paginaMTMPlaybook','🌐',t('check_pagina_playbook'),t('check_pagina_playbook_desc'))}
+            ${checkItemImage('paginaMTMChecklist','🌐',t('check_pagina_checklist'),t('check_pagina_checklist_desc'))}
+            ${checkItemImage('paginaMTMPlaybook','🌐',t('check_pagina_playbook'),t('check_pagina_playbook_desc'))}
           </div>
         </div>
         <div class="panel">
@@ -940,6 +978,59 @@ export default function PocManagerApp() {
         </div>
         ${done ? `<div class="info-bar"><span class="info-icon">🎉</span>${t('all_checks_done')}</div><button class="btn btn-green" style="width:100%;justify-content:center;font-size:15px;padding:14px" onclick="window._poc.finalizeCard('${cardId}')">${t('btn_finalize')}</button>` : ''}
       </div>`
+    }
+
+    function fileToBase64(file: File): Promise<string> {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+    }
+
+    function showImagePreview(key: string, dataUrl: string) {
+      const el = document.getElementById('img-el-' + key) as HTMLImageElement
+      const preview = document.getElementById('img-preview-' + key)
+      if (el) el.src = dataUrl
+      if (preview) preview.style.display = 'block'
+      // guarda no data attribute para salvar depois
+      if (el) el.dataset.base64 = dataUrl
+    }
+
+    async function handleCheckPaste(event: ClipboardEvent, cardId: string, key: string) {
+      const items = event.clipboardData?.items
+      if (!items) return
+      for (const item of Array.from(items)) {
+        if (item.type.startsWith('image/')) {
+          event.preventDefault()
+          const file = item.getAsFile()
+          if (!file) return
+          const base64 = await fileToBase64(file)
+          showImagePreview(key, base64)
+          return
+        }
+      }
+    }
+
+    async function handleCheckFile(event: Event, cardId: string, key: string) {
+      const input = event.target as HTMLInputElement
+      const file = input.files?.[0]
+      if (!file) return
+      const base64 = await fileToBase64(file)
+      showImagePreview(key, base64)
+    }
+
+    async function saveCheckImage(cardId: string, key: string) {
+      const el = document.getElementById('img-el-' + key) as HTMLImageElement
+      const base64 = el?.dataset.base64 || ''
+      if (!base64) { toast(lang==='pt'?'Cole ou selecione uma imagem.':'Pega o selecciona una imagen.', 'error'); return }
+      showLoading()
+      const res = await api('PATCH', `/api/pocs/${cardId}/checks`, { key, done: true, arquivo_url: base64, arquivo_name: `print_${key}.png` })
+      hideLoading()
+      if (!res.ok) { toast(res.error || 'Erro ao salvar.', 'error'); return }
+      toast(lang==='pt'?'Print salvo!':'¡Print guardado!', 'success')
+      await navigate('checks', cardId)
     }
 
     async function saveCheck(cardId: string, key: string) {
@@ -1038,7 +1129,8 @@ export default function PocManagerApp() {
       openShareModal, addShareUser, removeShare, saveShare,
       addApprover, toggleApproverForm, markApproved, markRejected,
       resetAndResubmit, sendApprovalEmails, advanceToHomologacao,
-      sendHomologEmail, advanceToChecks, saveCheck, sendChecksReminder, finalizeCard,
+      sendHomologEmail, advanceToChecks, saveCheck, saveCheckImage,
+      handleCheckPaste, handleCheckFile, sendChecksReminder, finalizeCard,
     }
 
     // ── INIT
