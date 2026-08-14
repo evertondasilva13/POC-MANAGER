@@ -939,7 +939,7 @@ export default function PocManagerApp() {
       const val = (document.getElementById('check-val-' + key) as HTMLInputElement)?.value.trim() || ''
       if (!val) { toast(lang==='pt'?'Insira o link.':'Ingresa el link.', 'error'); return }
       showLoading()
-      const res = await api('PATCH', `/api/pocs/${cardId}/checks`, { key, link: val })
+      const res = await api('PATCH', `/api/pocs/${cardId}/checks`, { key, link: val, done: true })
       hideLoading()
       if (!res.ok) { toast(res.error || 'Erro ao salvar check.', 'error'); return }
       toast(lang==='pt'?'Check salvo!':'¡Check guardado!', 'success')
