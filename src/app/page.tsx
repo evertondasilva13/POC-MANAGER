@@ -489,13 +489,14 @@ export default function PocManagerApp() {
     function kanbanCardHTML(card: any) {
       const canEdit = card.createdById === currentUser?.id || isAdmin
       const days = daysSince(card.createdAt)
-      const daysLabel = days === 0 ? (lang==='pt'?'hoje':'hoy') : t('days_ago', {n: days})
+      const creatorFullName = card.createdBy?.name || ''
+      const creatorName = creatorFullName ? esc(creatorFullName.split(' ')[0]) : (lang==='pt'?'Desconhecido':'Desconocido')
       return `<div class="kanban-card" onclick="window._poc.navigate('detail','${card.id}')">
         <div class="kanban-card-name">${esc(card.nome)}</div>
         <div class="kanban-card-kpi">🎯 ${esc(card.kpiChave)}</div>
         <div style="font-size:10px;color:var(--gray);margin-bottom:8px">📅 ${lang==='pt'?'Criado':'Creado'}: ${formatDate(card.createdAt)}</div>
         <div class="kanban-card-footer">
-          <span class="kanban-card-date">${daysLabel}</span>
+          <span class="kanban-card-date" title="${esc(creatorFullName)}">👤 ${creatorName}</span>
           <div class="kanban-card-actions" onclick="event.stopPropagation()">
             ${canEdit ? `<button class="icon-btn" title="${t('share_title')}" onclick="window._poc.openShareModal('${card.id}')">🔗</button>` : ''}
             ${canEdit ? `<button class="icon-btn" title="${t('btn_edit')}" onclick="window._poc.navigate('edit','${card.id}')">✏️</button>` : ''}
