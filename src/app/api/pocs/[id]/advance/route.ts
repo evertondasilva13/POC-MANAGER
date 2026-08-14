@@ -113,7 +113,8 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
 
   // E-mail automático de finalização para equipe MTM
-  if (to === 'finished') {
+  // Ativado apenas quando FINALIZATION_EMAIL_ENABLED=true nas variáveis de ambiente
+  if (to === 'finished' && process.env.FINALIZATION_EMAIL_ENABLED === 'true') {
     try {
       const checks = (poc.poc_checks || []).map((c: { key: string; link: string | null }) => ({
         key: c.key,
