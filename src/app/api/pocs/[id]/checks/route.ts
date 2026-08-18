@@ -41,7 +41,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     checklist: 'Checklist',
     playbook: 'Playbook',
     catalogo: 'Catálogo',
-    paginaMTM: 'Página MTM',
+    paginaMTMChecklist: 'Página MTM — Checklist',
+    paginaMTMPlaybook: 'Página MTM — Playbook',
   }
 
   await supabase.from('poc_history').insert({
