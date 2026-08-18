@@ -277,7 +277,8 @@ export default function PocManagerApp() {
           checklist: checksMap.checklist || { done: false, link: '' },
           playbook: checksMap.playbook || { done: false, link: '' },
           catalogo: checksMap.catalogo || { done: false, link: '' },
-          paginaMTM: checksMap.paginaMTM || { done: false, link: '' },
+          paginaMTMChecklist: checksMap.paginaMTMChecklist || { done: false, link: '', arquivo: null, arquivoName: null },
+          paginaMTMPlaybook: checksMap.paginaMTMPlaybook || { done: false, link: '', arquivo: null, arquivoName: null },
         },
         supervisorMTM: { nome: c.supervisor_mtm_nome || '', email: c.supervisor_mtm_email || '' },
         gerenteMTM: { nome: c.gerente_mtm_nome || '', email: c.gerente_mtm_email || '' },
@@ -606,6 +607,21 @@ export default function PocManagerApp() {
       await navigate('approval', savedId)
     }
 
+    async function advanceReadyFromDetail(cardId: string) {
+      const card = getCard(cardId)
+      if (!card) return
+      if (!card.resultado || !card.linkApresentacao) {
+        toast(t('missing_fields'), 'error')
+        await navigate('edit', cardId)
+        return
+      }
+      showLoading()
+      const res = await api('POST', `/api/pocs/${cardId}/advance`, { to: 'ready' })
+      hideLoading()
+      if (!res.ok) { toast(res.error || 'Erro ao avançar.', 'error'); return }
+      await navigate('approval', cardId)
+    }
+
     // ── DETAIL VIEW
     function renderDetail(cardId: string) {
       const card = getCard(cardId)
@@ -613,7 +629,8 @@ export default function PocManagerApp() {
       const canEdit = card.createdById === currentUser?.id || isAdmin
       let nextBtn = ''
       if (canEdit) {
-        if (card.status === 'draft' || card.status === 'ready') nextBtn = `<button class="btn btn-primary" onclick="window._poc.navigate('edit','${card.id}')">${t('btn_edit')}</button> <button class="btn btn-green" onclick="window._poc.navigate('approval','${card.id}')">${t('advance_approval')}</button>`
+        if (card.status === 'draft') nextBtn = `<button class="btn btn-primary" onclick="window._poc.navigate('edit','${card.id}')">${t('btn_edit')}</button> <button class="btn btn-green" onclick="window._poc.advanceReadyFromDetail('${card.id}')">${t('advance_approval')}</button>`
+        else if (card.status === 'ready') nextBtn = `<button class="btn btn-primary" onclick="window._poc.navigate('edit','${card.id}')">${t('btn_edit')}</button> <button class="btn btn-green" onclick="window._poc.navigate('approval','${card.id}')">${lang==='pt'?'Gerenciar Aprovação →':'Gestionar Aprobación →'}</button>`
         else if (card.status === 'approval') nextBtn = `<button class="btn btn-primary" onclick="window._poc.navigate('approval','${card.id}')">${lang==='pt'?'Gerenciar Aprovação':'Gestionar Aprobación'} →</button>`
         else if (card.status === 'homologacao') nextBtn = `<button class="btn btn-primary" onclick="window._poc.navigate('homologacao','${card.id}')">${lang==='pt'?'Gerenciar Homologação':'Gestionar Homologación'} →</button>`
         else if (card.status === 'checks') nextBtn = `<button class="btn btn-primary" onclick="window._poc.navigate('checks','${card.id}')">${lang==='pt'?'Gerenciar Pós-Homologação':'Gestionar Post-Homologación'} →</button>`
@@ -924,7 +941,7 @@ export default function PocManagerApp() {
         const item = ch[key] || {}
         const isDone = !!item.done
         const editId = `check-editing-${key}`
-        const hasImage = item.arquivo_url && item.arquivo_url.startsWith('data:image')
+        const hasImage = item.arquivo && item.arquivo.startsWith('data:image')
         return `<div class="check-item ${isDone ? 'done' : ''}">
           <div class="check-box">${isDone ? '✓' : ''}</div>
           <div class="check-label"><strong>${icon} ${label}</strong><p>${desc}</p></div>
@@ -951,7 +968,7 @@ export default function PocManagerApp() {
                 <span style="font-size:20px">✅</span>
                 <button class="btn btn-ghost btn-sm" onclick="document.getElementById('${editId}').style.display='flex';document.getElementById('${editId}').previousElementSibling && (document.getElementById('${editId}').style.display='flex')" style="font-size:11px;padding:5px 10px">✏️ ${lang==='pt'?'Trocar imagem':'Cambiar imagen'}</button>
               </div>
-              ${hasImage ? `<img src="${item.arquivo_url}" style="max-width:100%;max-height:160px;border-radius:8px;border:1px solid var(--border);object-fit:contain">` : ''}
+              ${hasImage ? `<img src="${item.arquivo}" style="max-width:100%;max-height:160px;border-radius:8px;border:1px solid var(--border);object-fit:contain">` : ''}
             </div>` : ''}
           </div>
         </div>`
@@ -1120,7 +1137,7 @@ export default function PocManagerApp() {
     // ── EXPOSE GLOBALLY (for onclick handlers)
     ;(window as any)._poc = {
       navigate, doLogin, doLogout, toggleLang, toggleAdmin, closeModal, openModal,
-      saveCard, advanceToApproval, confirmDelete, openDeleteModal,
+      saveCard, advanceToApproval, advanceReadyFromDetail, confirmDelete, openDeleteModal,
       openShareModal, addShareUser, removeShare, saveShare,
       addApprover, toggleApproverForm, markApproved, markRejected,
       resetAndResubmit, sendApprovalEmails, advanceToHomologacao,
