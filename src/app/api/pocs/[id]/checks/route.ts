@@ -1,57 +1,298 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { z } from 'zod'
-import { supabase } from '@/lib/supabase'
-import { getAuthUser, requireAuth } from '@/lib/auth'
+/**
+ * Serviço de e-mail via Brevo (antigo Sendinblue)
+ * Usa a API transacional REST diretamente (sem SDK para manter bundle pequeno)
+ */
 
-type Params = { params: { id: string } }
+const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email'
+const BREVO_API_KEY = process.env.BREVO_API_KEY!
+const FROM_EMAIL = process.env.EMAIL_FROM ?? 'poc-manager@mercadolivre.com'
+const FROM_NAME = process.env.EMAIL_FROM_NAME ?? 'POC Manager MTM'
 
-const CheckSchema = z.object({
-  key: z.enum(['checklist', 'playbook', 'catalogo', 'paginaMTMChecklist', 'paginaMTMPlaybook']),
-  done: z.boolean(),
-  link: z.string().optional(),
-  arquivo_url: z.string().optional(),
-  arquivo_name: z.string().optional(),
-})
+export interface EmailRecipient {
+  name: string
+  email: string
+}
 
-// PATCH /api/pocs/[id]/checks — atualiza um item do checklist
-export async function PATCH(req: NextRequest, { params }: Params) {
-  const user = await getAuthUser(req)
-  const authErr = requireAuth(user)
-  if (authErr) return authErr
+export interface SendEmailParams {
+  to: EmailRecipient[]
+  cc?: EmailRecipient[]
+  subject: string
+  htmlContent: string
+  textContent?: string
+}
 
-  const body = await req.json().catch(() => null)
-  const parsed = CheckSchema.safeParse(body)
-  if (!parsed.success) {
-    return NextResponse.json({ ok: false, error: parsed.error.issues[0].message }, { status: 400 })
+export async function sendEmail(params: SendEmailParams): Promise<void> {
+  const body = {
+    sender: { name: FROM_NAME, email: FROM_EMAIL },
+    to: params.to,
+    ...(params.cc && params.cc.length > 0 ? { cc: params.cc } : {}),
+    subject: params.subject,
+    htmlContent: params.htmlContent,
+    textContent: params.textContent ?? params.htmlContent.replace(/<[^>]+>/g, ''),
   }
 
-  const { key, ...update } = parsed.data
-
-  const { data, error } = await supabase
-    .from('poc_checks')
-    .update({ ...update, updated_at: new Date().toISOString() })
-    .eq('poc_id', params.id)
-    .eq('key', key)
-    .select()
-    .single()
-
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
-
-  const labels: Record<string, string> = {
-    checklist: 'Checklist',
-    playbook: 'Playbook',
-    catalogo: 'Catálogo',
-    paginaMTMChecklist: 'Página MTM — Checklist',
-    paginaMTMPlaybook: 'Página MTM — Playbook',
-  }
-
-  await supabase.from('poc_history').insert({
-    poc_id: params.id,
-    emoji: '☑️',
-    event: `Check concluído: ${labels[key]}`,
-    by_name: user!.name,
-    by_email: user!.email,
+  const res = await fetch(BREVO_API_URL, {
+    method: 'POST',
+    headers: {
+      'accept': 'application/json',
+      'api-key': BREVO_API_KEY,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(body),
   })
 
-  return NextResponse.json({ ok: true, data })
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`Brevo error ${res.status}: ${err}`)
+  }
+}
+
+// ─── TEMPLATES HTML ──────────────────────────────────────────────────────────
+
+const baseStyle = `
+  font-family: 'Inter', Arial, sans-serif;
+  color: #333;
+  max-width: 600px;
+  margin: 0 auto;
+`
+
+const headerStyle = `
+  background: #2C3E6B;
+  padding: 24px 28px;
+  border-radius: 12px 12px 0 0;
+`
+
+const bodyStyle = `
+  background: #fff;
+  padding: 24px 28px;
+  border: 1px solid #EBEBEB;
+  border-top: none;
+`
+
+const footerStyle = `
+  background: #F5F5F5;
+  padding: 16px 28px;
+  border-radius: 0 0 12px 12px;
+  font-size: 12px;
+  color: #717171;
+  border: 1px solid #EBEBEB;
+  border-top: none;
+`
+
+const btnStyle = (color = '#2C3E6B') => `
+  display: inline-block;
+  background: ${color};
+  color: #fff !important;
+  text-decoration: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 14px;
+  margin: 6px 4px;
+`
+
+function pocInfoBlock(poc: PocEmailData): string {
+  return `
+  <div style="background:#EEF2FF;border:1px solid rgba(44,62,107,0.18);border-radius:10px;padding:16px 20px;margin:16px 0">
+    <div style="font-size:15px;font-weight:700;color:#1E2D52;margin-bottom:10px">📌 ${poc.nome}</div>
+    <div style="font-size:13px;line-height:1.7;color:#333">
+      <b>Descrição:</b> ${poc.descricao}<br>
+      <b>KPI Chave:</b> ${poc.kpi_chave}<br>
+      ${poc.resultado ? `<b>Resultado:</b> ${poc.resultado}<br>` : ''}
+      ${poc.link_apresentacao ? `<b>Apresentação:</b> <a href="${poc.link_apresentacao}" style="color:#2C3E6B">${poc.link_apresentacao}</a><br>` : ''}
+      ${poc.arquivo_apresentacao_name ? `<b>Arquivo:</b> ${poc.arquivo_apresentacao_name}<br>` : ''}
+    </div>
+  </div>`
+}
+
+export interface PocEmailData {
+  nome: string
+  descricao: string
+  kpi_chave: string
+  resultado?: string | null
+  link_apresentacao?: string | null
+  arquivo_apresentacao_name?: string | null
+  desenho_tecnico_name?: string | null
+}
+
+// ─── 1. E-mail de Aprovação ────────────────────────────────────────────────
+export function buildApprovalEmail(
+  poc: PocEmailData,
+  recipientName: string,
+  approveUrl: string,
+  rejectUrl: string,
+  isReminder = false,
+  daysPending = 0
+): string {
+  return `
+  <div style="${baseStyle}">
+    <div style="${headerStyle}">
+      ${isReminder
+        ? `<div style="background:#C4631A;color:#fff;font-size:11px;font-weight:700;letter-spacing:1px;padding:4px 12px;border-radius:20px;display:inline-block;margin-bottom:10px">⏰ REMINDER — ${daysPending} dia(s) pendente</div>`
+        : ''}
+      <div style="font-size:20px;font-weight:900;color:#F5E97A;font-family:Raleway,Arial,sans-serif">
+        ${isReminder ? 'Aprovação Pendente' : 'Solicitação de Aprovação'}
+      </div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.65);margin-top:4px">POC Manager MTM — Mercado Livre</div>
+    </div>
+    <div style="${bodyStyle}">
+      <p style="font-size:14px;margin-top:0">Olá <b>${recipientName}</b>,</p>
+      <p style="font-size:13px;color:#555;line-height:1.6">
+        ${isReminder
+          ? `Gostaríamos de lembrar que a POC abaixo ainda aguarda sua aprovação há <b>${daysPending} dia(s)</b>.`
+          : 'Você foi indicado(a) como aprovador(a) da seguinte Prova de Conceito:'}
+      </p>
+      ${pocInfoBlock(poc)}
+      ${poc.link_apresentacao || poc.arquivo_apresentacao_name ? `
+      <div style="background:#F0FDF4;border:1px solid rgba(46,125,94,0.25);border-radius:10px;padding:14px 18px;margin:16px 0;display:flex;align-items:center;gap:14px">
+        <div style="font-size:28px">📎</div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:700;color:#1E2D52;margin-bottom:4px">Material da POC</div>
+          ${poc.link_apresentacao
+            ? `<a href="${poc.link_apresentacao}" style="font-size:13px;color:#2E7D5E;font-weight:600;word-break:break-all">🔗 Acessar Apresentação</a>`
+            : `<span style="font-size:13px;color:#555">📄 ${poc.arquivo_apresentacao_name}</span>`
+          }
+        </div>
+        ${poc.link_apresentacao ? `<a href="${poc.link_apresentacao}" style="${btnStyle('#2E7D5E')};margin:0;font-size:13px;padding:10px 18px">Abrir →</a>` : ''}
+      </div>` : ''}
+      <div style="border-top:1px solid #EBEBEB;margin:20px 0"></div>
+      <p style="font-size:13px;margin-bottom:8px"><b>Clique em uma das opções abaixo para registrar sua resposta:</b></p>
+      <a href="${approveUrl}" style="${btnStyle('#2E7D5E')}">✅ Aprovar</a>
+      <a href="${rejectUrl}" style="${btnStyle('#C0392B')}">❌ Reprovar</a>
+      <p style="font-size:11px;color:#717171;margin-top:16px;line-height:1.5">
+        Ao clicar, sua resposta será registrada automaticamente no sistema.<br>
+        Este link é exclusivo para <b>${recipientName}</b> e só pode ser usado uma vez.
+      </p>
+    </div>
+    <div style="${footerStyle}">
+      POC Manager MTM — Mercado Livre &bull; Este e-mail foi gerado automaticamente.
+    </div>
+  </div>`
+}
+
+// ─── 2. E-mail de Homologação ──────────────────────────────────────────────
+export function buildHomologacaoEmail(poc: PocEmailData): string {
+  return `
+  <div style="${baseStyle}">
+    <div style="${headerStyle}">
+      <div style="font-size:20px;font-weight:900;color:#F5E97A;font-family:Raleway,Arial,sans-serif">
+        Equipamento Validado para Homologação
+      </div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.65);margin-top:4px">POC Manager MTM — Mercado Livre</div>
+    </div>
+    <div style="${bodyStyle}">
+      <p style="font-size:14px;margin-top:0">Olá,</p>
+      <p style="font-size:13px;color:#555;line-height:1.6">
+        Informamos que o equipamento da POC abaixo foi <b>validado e aprovado</b> para seguir para a etapa de homologação.
+      </p>
+      ${pocInfoBlock(poc)}
+      ${poc.desenho_tecnico_name
+        ? `<div style="background:#E0F5F7;border:1px solid rgba(11,126,138,0.2);border-radius:8px;padding:12px 16px;font-size:12px;color:#0B7E8A;margin-bottom:12px">
+            📐 <b>Desenho Técnico:</b> ${poc.desenho_tecnico_name} (em anexo ao e-mail original)
+           </div>`
+        : ''}
+      <p style="font-size:13px;color:#555;line-height:1.6">
+        Por favor, siga com o processo de homologação conforme os procedimentos internos do time MTM.
+      </p>
+    </div>
+    <div style="${footerStyle}">
+      POC Manager MTM — Mercado Livre &bull; Este e-mail foi gerado automaticamente.
+    </div>
+  </div>`
+}
+
+// ─── 3. E-mail de Finalização (para Letícia, Lívia e Marina) ─────────────
+export interface CheckItem {
+  key: string
+  label: string
+  link?: string | null
+}
+
+export function buildFinalizationEmail(
+  poc: PocEmailData,
+  checks: CheckItem[],
+  finalizadoPor: string
+): string {
+  const checkRows = checks.map(c =>
+    `<tr>
+      <td style="padding:8px 12px;border-bottom:1px solid #EBEBEB;font-size:13px;color:#333">✅ ${c.label}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #EBEBEB;font-size:13px">
+        ${c.link ? `<a href="${c.link}" style="color:#2C3E6B;word-break:break-all">${c.link}</a>` : '<span style="color:#aaa">—</span>'}
+      </td>
+    </tr>`
+  ).join('')
+
+  return `
+  <div style="${baseStyle}">
+    <div style="${headerStyle}">
+      <div style="background:#2E7D5E;color:#fff;font-size:11px;font-weight:700;letter-spacing:1px;padding:4px 12px;border-radius:20px;display:inline-block;margin-bottom:10px">🏆 POC FINALIZADA</div>
+      <div style="font-size:20px;font-weight:900;color:#F5E97A;font-family:Raleway,Arial,sans-serif">
+        POC Concluída com Sucesso!
+      </div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.65);margin-top:4px">POC Manager MTM — Mercado Livre</div>
+    </div>
+    <div style="${bodyStyle}">
+      <p style="font-size:14px;margin-top:0">Olá equipe MTM,</p>
+      <p style="font-size:13px;color:#555;line-height:1.6">
+        A seguinte POC foi <b>finalizada com sucesso</b> por <b>${finalizadoPor}</b> e todos os itens do checklist pós-homologação foram concluídos:
+      </p>
+      ${pocInfoBlock(poc)}
+      <p style="font-size:13px;font-weight:700;color:#1E2D52;margin-bottom:8px">Checklist Pós-Homologação:</p>
+      <table style="width:100%;border-collapse:collapse;border:1px solid #EBEBEB;border-radius:8px;overflow:hidden">
+        <thead>
+          <tr style="background:#F5F5F0">
+            <th style="padding:10px 12px;font-size:12px;color:#717171;text-align:left;font-weight:700">Item</th>
+            <th style="padding:10px 12px;font-size:12px;color:#717171;text-align:left;font-weight:700">Link / Evidência</th>
+          </tr>
+        </thead>
+        <tbody>${checkRows}</tbody>
+      </table>
+      <p style="font-size:13px;color:#555;line-height:1.6;margin-top:16px">
+        Esta é uma notificação automática de visibilidade. Nenhuma ação é necessária.
+      </p>
+    </div>
+    <div style="${footerStyle}">
+      POC Manager MTM — Mercado Livre &bull; Este e-mail foi gerado automaticamente na finalização da POC.
+    </div>
+  </div>`
+}
+
+// ─── 4. Reminder pós-homologação ──────────────────────────────────────────
+export function buildChecksReminderEmail(
+  poc: PocEmailData,
+  pendingItems: string[],
+  daysPending = 0
+): string {
+  const itemList = pendingItems.map(item => `<li style="margin-bottom:6px">❌ ${item}</li>`).join('')
+
+  return `
+  <div style="${baseStyle}">
+    <div style="${headerStyle}">
+      <div style="background:#C4631A;color:#fff;font-size:11px;font-weight:700;letter-spacing:1px;padding:4px 12px;border-radius:20px;display:inline-block;margin-bottom:10px">
+        ⏰ REMINDER${daysPending > 0 ? ` — ${daysPending} dias pendente` : ''}
+      </div>
+      <div style="font-size:20px;font-weight:900;color:#F5E97A;font-family:Raleway,Arial,sans-serif">
+        Pendências Pós-Homologação
+      </div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.65);margin-top:4px">POC Manager MTM — Mercado Livre</div>
+    </div>
+    <div style="${bodyStyle}">
+      <p style="font-size:14px;margin-top:0">Olá,</p>
+      <p style="font-size:13px;color:#555;line-height:1.6">
+        As seguintes pendências pós-homologação ainda precisam ser concluídas para finalizar a POC <b>"${poc.nome}"</b>:
+      </p>
+      <ul style="font-size:13px;color:#333;line-height:1.8;padding-left:20px">
+        ${itemList}
+      </ul>
+      <p style="font-size:13px;color:#555;line-height:1.6;margin-top:12px">
+        Por favor, acesse o POC Manager e conclua as pendências o quanto antes.
+      </p>
+      ${poc.link_apresentacao
+        ? `<p style="font-size:12px;color:#717171">Referência: <a href="${poc.link_apresentacao}" style="color:#2C3E6B">${poc.link_apresentacao}</a></p>`
+        : ''}
+    </div>
+    <div style="${footerStyle}">
+      POC Manager MTM — Mercado Livre &bull; Reminders são enviados a cada 5 dias até a conclusão.
+    </div>
+  </div>`
 }
