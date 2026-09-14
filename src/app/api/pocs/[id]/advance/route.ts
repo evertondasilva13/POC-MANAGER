@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { supabase } from '@/lib/supabase'
 import { getAuthUser, requireAuth } from '@/lib/auth'
+import { requirePocManager } from '@/lib/poc-permissions'
 import { sendEmail, buildFinalizationEmail } from '@/lib/email'
 import type { PocStatus } from '@/types'
 
@@ -46,6 +47,9 @@ export async function POST(req: NextRequest, { params }: Params) {
   const user = await getAuthUser(req)
   const authErr = requireAuth(user)
   if (authErr) return authErr
+
+  const permissionErr = await requirePocManager(user!, params.id)
+  if (permissionErr) return permissionErr
 
   const body = await req.json().catch(() => null)
   const parsed = AdvanceSchema.safeParse(body)

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { supabase } from '@/lib/supabase'
 import { getAuthUser, requireAuth } from '@/lib/auth'
+import { requirePocManager } from '@/lib/poc-permissions'
 import { sendEmail, buildChecksReminderEmail } from '@/lib/email'
 
 type Params = { params: { id: string } }
@@ -15,7 +16,8 @@ const CHECK_LABELS: Record<string, string> = {
   checklist: 'Criação de Checklist',
   playbook: 'Playbook',
   catalogo: 'Catálogo',
-  paginaMTM: 'Página MTM',
+  paginaMTMChecklist: 'Página MTM — Checklist',
+  paginaMTMPlaybook: 'Página MTM — Playbook',
 }
 
 // POST /api/pocs/[id]/send-checks-reminder
@@ -23,6 +25,9 @@ export async function POST(req: NextRequest, { params }: Params) {
   const user = await getAuthUser(req)
   const authErr = requireAuth(user)
   if (authErr) return authErr
+
+  const permissionErr = await requirePocManager(user!, params.id)
+  if (permissionErr) return permissionErr
 
   const body = await req.json().catch(() => ({}))
   const parsed = SendSchema.safeParse(body)
@@ -43,7 +48,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   }
 
   const checks = poc.poc_checks || []
-  const pendingKeys = ['checklist', 'playbook', 'catalogo', 'paginaMTM'].filter(
+  const pendingKeys = ['checklist', 'playbook', 'catalogo', 'paginaMTMChecklist', 'paginaMTMPlaybook'].filter(
     (k) => !checks.find((c: { key: string; done: boolean }) => c.key === k)?.done
   )
 
