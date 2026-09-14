@@ -206,8 +206,8 @@ header{background:var(--yellow);height:60px;padding:0 2rem;display:flex;align-it
 
 /* ── KANBAN ── */
 .kanban-toolbar{display:flex;align-items:center;justify-content:space-between;padding:.875rem 1.5rem;flex-wrap:wrap;gap:10px;background:white;border-bottom:1px solid var(--border)}
-.kanban-wrapper{padding:1rem 1.5rem 0;height:calc(100vh - 280px);overflow:hidden}
-.kanban-board{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;height:100%}
+.kanban-wrapper{padding:1rem 1.5rem 0;height:calc(100vh - 280px);overflow:hidden;width:100%}
+.kanban-board{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;height:100%;width:100%}
 .kanban-col{min-width:0;background:white;border-radius:16px;border:1px solid var(--border);overflow:hidden;display:flex;flex-direction:column;height:100%}
 .kanban-col-header{padding:.875rem 1rem;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
 .kanban-col-header .col-title{font-family:'Raleway',sans-serif;font-size:12px;font-weight:800;letter-spacing:.5px;text-transform:uppercase}

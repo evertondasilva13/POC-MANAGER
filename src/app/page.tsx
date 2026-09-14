@@ -478,7 +478,7 @@ export default function PocManagerApp() {
       </div></div>
       <div class="kanban-toolbar">
         <div class="section-title" style="margin-bottom:0;flex:1">${lang==='pt'?'Quadro de Projetos':'Tablero de Proyectos'}</div>
-        <input aria-label="Buscar por responsável" value="${esc(responsibleSearch)}" oninput="window._poc.searchByResponsible(this.value)" placeholder="${lang==='pt'?'Buscar pelo primeiro nome':'Buscar por primer nombre'}" style="max-width:260px;margin-right:8px">
+        <input id="responsible-search" aria-label="Buscar por responsável" value="${esc(responsibleSearch)}" oninput="window._poc.searchByResponsible(this.value)" placeholder="${lang==='pt'?'Buscar pelo primeiro nome':'Buscar por primer nombre'}" style="max-width:260px;margin-right:8px">
         <button class="btn btn-primary" onclick="window._poc.navigate('create')">${t('btn_new')}</button>
       </div>
       <div class="kanban-wrapper">`
@@ -523,6 +523,11 @@ export default function PocManagerApp() {
     function searchByResponsible(value: string) {
       responsibleSearch = value
       renderCurrent()
+      // A busca redesenha somente o quadro. Reaplica o foco para que seja
+      // possível digitar normalmente, sem clicar no campo a cada letra.
+      const input = document.getElementById('responsible-search') as HTMLInputElement | null
+      input?.focus()
+      input?.setSelectionRange(value.length, value.length)
     }
 
     // ── CREATE / EDIT FORM
