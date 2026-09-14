@@ -108,7 +108,7 @@ comment on table poc_responsaveis is 'Responsáveis por área na etapa de Homolo
 create table if not exists poc_checks (
   id          uuid primary key default gen_random_uuid(),
   poc_id      uuid not null references pocs(id) on delete cascade,
-  key         text not null check (key in ('checklist','playbook','catalogo','paginaMTM')),
+  key         text not null check (key in ('checklist','playbook','catalogo','paginaMTMChecklist','paginaMTMPlaybook')),
   done        boolean not null default false,
   link        text,
   arquivo_url  text,

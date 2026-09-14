@@ -18,24 +18,25 @@ export default function PocManagerApp() {
     let shareCardId: string | null = null
     let tempShareList: any[] = []
     let isAdmin = false
+    let responsibleSearch = ''
     let pendingEmailOnSend: (() => void) | null = null
 
     // ── i18n
     const T: any = {
       pt: {
-        header_sub:'Gestão de POCs', nav_dashboard:'Dashboard',
+        header_sub:'Gestão de Projetos', nav_dashboard:'Dashboard',
         login_title:'Identificação', login_sub:'Para acessar o POC Manager',
         login_name:'Seu nome', login_email:'Seu e-mail corporativo', login_btn:'Entrar →',
-        hero_eyebrow:'🧪 Gestão de Projetos', hero_title:'POCs <span>MTM</span>',
-        hero_sub:'Gerencie o ciclo de vida de Provas de Conceito, da criação à homologação.',
-        btn_new:'+ Nova POC', btn_close:'Fechar', btn_cancel:'Cancelar',
+        hero_eyebrow:'🧪 Gestão de Projetos', hero_title:'Projetos <span>MTM</span>',
+        hero_sub:'Gerencie o ciclo de vida dos projetos, da criação à finalização.',
+        btn_new:'+ Novo projeto', btn_close:'Fechar', btn_cancel:'Cancelar',
         btn_save:'Salvar', btn_delete:'Excluir', btn_edit:'Editar',
         share_title:'Compartilhar acesso', share_sub:'Adicione pessoas que podem ver e editar este card',
         share_name:'Nome', share_email:'E-mail', share_add:'+ Adicionar',
         confirm_title:'Confirmar exclusão', confirm_sub:'Essa ação não pode ser desfeita',
         confirm_msg:'Tem certeza que deseja excluir este card de POC?',
         email_preview_sub:'Assim chegará para o destinatário',
-        stat_total:'Total', stat_approval:'Em Aprovação', stat_finished:'Finalizados',
+        stat_total:'Total', stat_in_progress:'Em andamento', stat_finished:'Finalizados',
         section_my:'Minhas POCs', section_shared:'Compartilhadas comigo',
         empty_title:'Nenhuma POC ainda', empty_msg:'Crie sua primeira Prova de Conceito para começar o processo de homologação.',
         status_draft:'Rascunho', status_ready:'Pronto para Aprovação',
@@ -99,7 +100,7 @@ export default function PocManagerApp() {
         header_sub:'Gestión de POCs', nav_dashboard:'Dashboard',
         login_title:'Identificación', login_sub:'Para acceder al POC Manager',
         login_name:'Tu nombre', login_email:'Tu e-mail corporativo', login_btn:'Entrar →',
-        hero_eyebrow:'🧪 Gestión de Proyectos', hero_title:'POCs <span>MTM</span>',
+        hero_eyebrow:'🧪 Gestión de Proyectos', hero_title:'Proyectos <span>MTM</span>',
         hero_sub:'Gestiona el ciclo de vida de las Pruebas de Concepto.',
         btn_new:'+ Nueva POC', btn_close:'Cerrar', btn_cancel:'Cancelar',
         btn_save:'Guardar', btn_delete:'Eliminar', btn_edit:'Editar',
@@ -108,7 +109,7 @@ export default function PocManagerApp() {
         confirm_title:'Confirmar eliminación', confirm_sub:'Esta acción no puede deshacerse',
         confirm_msg:'¿Estás seguro de que deseas eliminar este card de POC?',
         email_preview_sub:'Así llegará al destinatario',
-        stat_total:'Total', stat_approval:'En Aprobación', stat_finished:'Finalizados',
+        stat_total:'Total', stat_in_progress:'En curso', stat_finished:'Finalizados',
         section_my:'Mis POCs', section_shared:'Compartidas conmigo',
         empty_title:'Ninguna POC aún', empty_msg:'Crea tu primera Prueba de Concepto para iniciar el proceso de homologación.',
         status_draft:'Borrador', status_ready:'Listo para Aprobación',
@@ -189,8 +190,6 @@ export default function PocManagerApp() {
       return Math.floor(((to ? new Date(to) : new Date()).getTime() - new Date(from).getTime()) / (1000*60*60*24))
     }
     function getCard(id: string) { return cards.find((c: any) => c.id === id) }
-    function myCards() { return cards.filter((c: any) => c.createdById === currentUser?.id) }
-    function sharedCards() { return cards.filter((c: any) => c.createdById !== currentUser?.id && (c.sharedWith||[]).some((s: any) => s.email === currentUser?.email)) }
     function allApproved(card: any) {
       const all = [...(card.aprovadoresOperacao||[]), ...(card.aprovadoresSHE||[])]
       if (all.length === 0) return false
@@ -321,14 +320,8 @@ export default function PocManagerApp() {
     function updateAdminChip() {
       const chip = document.getElementById('admin-chip')
       if (!chip) return
-      if (isAdmin) { chip.classList.add('active'); chip.innerHTML = '🔑 Admin ✓' }
-      else { chip.classList.remove('active'); chip.innerHTML = '🔑 Admin' }
-    }
-    function toggleAdmin() {
-      isAdmin = !isAdmin
-      updateAdminChip()
-      toast(isAdmin ? '🔑 Modo administrador ativado!' : 'Modo admin desativado.', isAdmin ? 'success' : '')
-      renderCurrent()
+      chip.classList.add('active')
+      chip.innerHTML = '🔑 Admin'
     }
     function updateUserUI() {
       const chip = document.getElementById('user-chip')
@@ -456,20 +449,19 @@ export default function PocManagerApp() {
 
     // ── DASHBOARD
     function renderDashboard() {
-      const mine = myCards()
-      const shared = sharedCards()
-      const adminExtra = isAdmin ? cards.filter((c: any) => c.createdById !== currentUser?.id && !(c.sharedWith||[]).some((s: any) => s.email === currentUser?.email)) : []
-      const allVisible = [...mine, ...shared, ...(isAdmin ? adminExtra : [])]
+      const search = responsibleSearch.trim().toLocaleLowerCase()
+      const allVisible = search
+        ? cards.filter((c: any) => (c.createdBy?.name || '').split(' ')[0].toLocaleLowerCase().includes(search))
+        : cards
       const total = allVisible.length
-      const inApproval = allVisible.filter((c: any) => c.status === 'approval').length
+      const inProgress = allVisible.filter((c: any) => c.status !== 'finished').length
       const finished = allVisible.filter((c: any) => c.status === 'finished').length
       const COLS = [
-        {key:'draft', label:lang==='pt'?'Rascunho':'Borrador', emoji:'⬜'},
-        {key:'ready', label:lang==='pt'?'Pronto p/ Aprovação':'Listo p/ Aprobación', emoji:'🔵'},
-        {key:'approval', label:lang==='pt'?'Em Aprovação':'En Aprobación', emoji:'🟡'},
-        {key:'homologacao', label:lang==='pt'?'Homologação':'Homologación', emoji:'🟣'},
-        {key:'checks', label:lang==='pt'?'Pós-Homologação':'Post-Homologación', emoji:'🩵'},
-        {key:'finished', label:lang==='pt'?'Finalizado':'Finalizado', emoji:'✅'},
+        {key:'discovery', label:'Discovery', emoji:'🔎'},
+        {key:'approval', label:lang==='pt'?'Projeto em aprovação':'Proyecto en aprobación', emoji:'🟡'},
+        {key:'homologacao', label:lang==='pt'?'Projeto em homologação':'Proyecto en homologación', emoji:'🟣'},
+        {key:'checks', label:lang==='pt'?'Projeto em pós-homologação':'Proyecto en post-homologación', emoji:'🩵'},
+        {key:'finished', label:lang==='pt'?'Projeto finalizado':'Proyecto finalizado', emoji:'✅'},
       ]
       let html = `
       <div class="hero hero-sticky"><div class="hero-inner">
@@ -480,12 +472,13 @@ export default function PocManagerApp() {
         </div>
         <div class="hero-stats">
           <div class="stat-chip"><div class="stat-num">${total}</div><div class="stat-label">${t('stat_total')}</div></div>
-          <div class="stat-chip"><div class="stat-num">${inApproval}</div><div class="stat-label">${t('stat_approval')}</div></div>
+          <div class="stat-chip"><div class="stat-num">${inProgress}</div><div class="stat-label">${t('stat_in_progress')}</div></div>
           <div class="stat-chip"><div class="stat-num">${finished}</div><div class="stat-label">${t('stat_finished')}</div></div>
         </div>
       </div></div>
       <div class="kanban-toolbar">
-        <div class="section-title" style="margin-bottom:0;flex:1">${lang==='pt'?'Quadro de POCs':'Tablero de POCs'}</div>
+        <div class="section-title" style="margin-bottom:0;flex:1">${lang==='pt'?'Quadro de Projetos':'Tablero de Proyectos'}</div>
+        <input aria-label="Buscar por responsável" value="${esc(responsibleSearch)}" oninput="window._poc.searchByResponsible(this.value)" placeholder="${lang==='pt'?'Buscar pelo primeiro nome':'Buscar por primer nombre'}" style="max-width:260px;margin-right:8px">
         <button class="btn btn-primary" onclick="window._poc.navigate('create')">${t('btn_new')}</button>
       </div>
       <div class="kanban-wrapper">`
@@ -494,7 +487,9 @@ export default function PocManagerApp() {
       } else {
         html += `<div class="kanban-board">`
         COLS.forEach(col => {
-          const colCards = allVisible.filter((c: any) => (c.status || 'draft') === col.key)
+          const colCards = allVisible.filter((c: any) => col.key === 'discovery'
+            ? ['draft', 'ready'].includes(c.status || 'draft')
+            : (c.status || 'draft') === col.key)
           html += `<div class="kanban-col ${col.key}"><div class="kanban-col-header"><span class="col-title">${col.emoji} ${col.label}</span><span class="col-count">${colCards.length}</span></div><div class="kanban-cards">`
           if (colCards.length === 0) html += `<div class="kanban-empty">${lang==='pt'?'Nenhuma POC':'Ningún POC'}</div>`
           else colCards.forEach((c: any) => { html += kanbanCardHTML(c) })
@@ -523,6 +518,11 @@ export default function PocManagerApp() {
           </div>
         </div>
       </div>`
+    }
+
+    function searchByResponsible(value: string) {
+      responsibleSearch = value
+      renderCurrent()
     }
 
     // ── CREATE / EDIT FORM
@@ -710,8 +710,9 @@ export default function PocManagerApp() {
       const approved = allApproved(card)
       const allApprovers = [...(card.aprovadoresOperacao||[]), ...(card.aprovadoresSHE||[])]
       const hasRejection = allApprovers.some((a: any) => a.reprovado)
-      // Mostra botão de envio se nunca enviou OU se há aprovadores cujo enviado_em foi resetado
-      const hasUnsent = allApprovers.some((a: any) => !a.enviado_em && !a.aprovado)
+      // Cada aprovador tem seu próprio instante de envio. Novos aprovadores
+      // devem poder receber o e-mail mesmo depois do primeiro lote.
+      const hasUnsent = allApprovers.some((a: any) => !a.enviadoEm && !a.aprovado)
       const canSend = !sent || hasUnsent
 
       const renderApproverRows = (type: string) => {
@@ -721,12 +722,19 @@ export default function PocManagerApp() {
         ;(list || []).forEach((a: any) => {
           const stClass = a.aprovado ? 'approved' : a.reprovado ? 'rejected' : 'pending'
           const stLabel = a.aprovado ? (lang==='pt'?'Aprovado':'Aprobado') : a.reprovado ? (lang==='pt'?'Reprovado':'Reprobado') : (lang==='pt'?'Pendente':'Pendiente')
-          const daysPend = (a.aprovado || a.reprovado) ? 0 : daysSince(a.enviadoEm || sent || card.createdAt)
+          // Não use a data global da POC como fallback: ela faria um aprovador
+          // recém-adicionado parecer pendente desde o primeiro envio.
+          const daysPend = a.enviadoEm ? daysSince(a.enviadoEm) : null
+          const pendingInfo = !a.aprovado && !a.reprovado
+            ? (daysPend === null
+                ? `<div class="days-pending">${lang==='pt'?'Aguardando envio':'Pendiente de envío'}</div>`
+                : `<div class="days-pending">${daysPend === 0 ? (lang==='pt'?'Enviado hoje':'Enviado hoy') : t('days_pending', {n: daysPend})}</div>`)
+            : ''
           html += `<div class="approver-status-row ${stClass}" style="${a.reprovado?'background:var(--red-light);border-color:rgba(192,57,43,0.25)':''}">
             <div>
               <div class="approver-info">${esc(a.nome)}</div>
               <div class="approver-email">${esc(a.email)}</div>
-              ${!a.aprovado && !a.reprovado && daysPend > 0 ? `<div class="days-pending">${t('days_pending', {n: daysPend})}</div>` : ''}
+              ${pendingInfo}
               ${a.reprovado && a.motivoReprovacao ? `<div style="font-size:11px;color:var(--red);margin-top:3px;font-style:italic">"${esc(a.motivoReprovacao)}"</div>` : ''}
             </div>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -1136,7 +1144,7 @@ export default function PocManagerApp() {
 
     // ── EXPOSE GLOBALLY (for onclick handlers)
     ;(window as any)._poc = {
-      navigate, doLogin, doLogout, toggleLang, toggleAdmin, closeModal, openModal,
+      navigate, doLogin, doLogout, toggleLang, searchByResponsible, closeModal, openModal,
       saveCard, advanceToApproval, advanceReadyFromDetail, confirmDelete, openDeleteModal,
       openShareModal, addShareUser, removeShare, saveShare,
       addApprover, toggleApproverForm, markApproved, markRejected,
@@ -1192,13 +1200,13 @@ export default function PocManagerApp() {
           </div>
           <div>
             <div className="logo-name">Mercado Livre</div>
-            <div className="logo-sub" id="header-sub">Gestão de POCs</div>
+            <div className="logo-sub" id="header-sub">Gestão de Projetos</div>
           </div>
         </div>
         <div className="header-right">
           <a id="btn-inicio" className="btn-header" href="https://mtmtransportes-paginainicialpt.vercel.app/" target="_blank">🏠 Início</a>
           <button className="btn-header" onClick={() => (window as any)._poc?.toggleLang()} id="lang-btn">🇧🇷 PT</button>
-          <div className="admin-chip" id="admin-chip" onClick={() => (window as any)._poc?.toggleAdmin()} title="Modo Administrador" style={{display:'none'}}>🔑 Admin</div>
+          <div className="admin-chip" id="admin-chip" title="Administrador" style={{display:'none'}}>🔑 Admin</div>
           <div className="user-chip" id="user-chip" style={{display:'none'}}>
             <span>👤</span> <strong id="user-name-display"></strong>
           </div>

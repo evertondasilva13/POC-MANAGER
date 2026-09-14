@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { supabase } from '@/lib/supabase'
-import { getAuthUser, requireAuth } from '@/lib/auth'
+import { getAuthUser, requireAdmin, requireAuth } from '@/lib/auth'
+import { requirePocManager } from '@/lib/poc-permissions'
 
 type Params = { params: { id: string; approverId: string } }
 
@@ -16,6 +17,11 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const user = await getAuthUser(req)
   const authErr = requireAuth(user)
   if (authErr) return authErr
+
+  // Marcação manual altera o resultado da aprovação; por isso é uma exceção
+  // administrativa. O aprovador normal continua aprovando pelo link recebido.
+  const adminErr = requireAdmin(user)
+  if (adminErr) return adminErr
 
   const body = await req.json().catch(() => null)
   const parsed = ActionSchema.safeParse(body)
@@ -73,6 +79,9 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   const user = await getAuthUser(req)
   const authErr = requireAuth(user)
   if (authErr) return authErr
+
+  const permissionErr = await requirePocManager(user!, params.id)
+  if (permissionErr) return permissionErr
 
   const { error } = await supabase
     .from('poc_approvers')

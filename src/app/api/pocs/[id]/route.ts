@@ -2,18 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { supabase } from '@/lib/supabase'
 import { getAuthUser, requireAuth } from '@/lib/auth'
+import { requirePocManager } from '@/lib/poc-permissions'
 
 type Params = { params: { id: string } }
-
-async function canEdit(userId: string, isAdmin: boolean, pocId: string) {
-  if (isAdmin) return true
-  const { data } = await supabase
-    .from('pocs')
-    .select('created_by_id')
-    .eq('id', pocId)
-    .single()
-  return data?.created_by_id === userId
-}
 
 // GET /api/pocs/[id]
 export async function GET(req: NextRequest, { params }: Params) {
@@ -38,13 +29,6 @@ export async function GET(req: NextRequest, { params }: Params) {
     return NextResponse.json({ ok: false, error: 'POC não encontrada.' }, { status: 404 })
   }
 
-  // Verifica acesso
-  const isMine = poc.created_by_id === user!.sub
-  const isShared = poc.poc_shares?.some((s: { user_email: string }) => s.user_email === user!.email)
-  if (!isMine && !isShared && !user!.is_admin) {
-    return NextResponse.json({ ok: false, error: 'Acesso negado.' }, { status: 403 })
-  }
-
   return NextResponse.json({ ok: true, data: poc })
 }
 
@@ -66,9 +50,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
   const authErr = requireAuth(user)
   if (authErr) return authErr
 
-  if (!(await canEdit(user!.sub, user!.is_admin, params.id))) {
-    return NextResponse.json({ ok: false, error: 'Acesso negado.' }, { status: 403 })
-  }
+  const permissionErr = await requirePocManager(user!, params.id)
+  if (permissionErr) return permissionErr
 
   const body = await req.json().catch(() => null)
   const parsed = UpdateSchema.safeParse(body)
@@ -102,9 +85,8 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   const authErr = requireAuth(user)
   if (authErr) return authErr
 
-  if (!(await canEdit(user!.sub, user!.is_admin, params.id))) {
-    return NextResponse.json({ ok: false, error: 'Acesso negado.' }, { status: 403 })
-  }
+  const permissionErr = await requirePocManager(user!, params.id)
+  if (permissionErr) return permissionErr
 
   const { error } = await supabase.from('pocs').delete().eq('id', params.id)
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })

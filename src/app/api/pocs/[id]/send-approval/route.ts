@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { SignJWT } from 'jose'
 import { supabase } from '@/lib/supabase'
 import { getAuthUser, requireAuth } from '@/lib/auth'
+import { requirePocManager } from '@/lib/poc-permissions'
 import { sendEmail, buildApprovalEmail } from '@/lib/email'
 
 const jwtSecret = new TextEncoder().encode(process.env.JWT_SECRET!)
@@ -19,6 +20,9 @@ export async function POST(req: NextRequest, { params }: Params) {
   const user = await getAuthUser(req)
   const authErr = requireAuth(user)
   if (authErr) return authErr
+
+  const permissionErr = await requirePocManager(user!, params.id)
+  if (permissionErr) return permissionErr
 
   const body = await req.json().catch(() => ({}))
   const parsed = SendSchema.safeParse(body)
@@ -53,6 +57,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const now = new Date().toISOString()
   const errors: string[] = []
+  const sentApprovers: typeof approvers = []
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://poc-manager-mtm.vercel.app'
 
   for (const approver of approvers) {
@@ -67,12 +72,6 @@ export async function POST(req: NextRequest, { params }: Params) {
         .setIssuedAt()
         .setExpirationTime('30d')
         .sign(jwtSecret)
-
-      // Atualiza apenas enviado_em (token fica no JWT, não precisa salvar no banco)
-      await supabase
-        .from('poc_approvers')
-        .update({ enviado_em: now })
-        .eq('id', approver.id)
 
       const approveUrl = `${baseUrl}/api/approve?token=${encodeURIComponent(approvalToken)}&action=approve`
       const rejectUrl = `${baseUrl}/api/approve?token=${encodeURIComponent(approvalToken)}&action=reject`
@@ -91,13 +90,22 @@ export async function POST(req: NextRequest, { params }: Params) {
           daysPending
         ),
       })
+
+      // Só registra o envio depois que o Brevo aceitou a mensagem. Assim um
+      // erro de entrega não impede uma nova tentativa para esse aprovador.
+      const { error: sentAtError } = await supabase
+        .from('poc_approvers')
+        .update({ enviado_em: now })
+        .eq('id', approver.id)
+      if (sentAtError) throw new Error(`Não foi possível registrar o envio: ${sentAtError.message}`)
+      sentApprovers.push(approver)
     } catch (e) {
       errors.push(`${approver.email}: ${(e as Error).message}`)
     }
   }
 
-  // Primeira vez: avança status para 'approval'
-  if (!is_reminder && poc.status === 'ready') {
+  // Só avança a POC e registra histórico se pelo menos um e-mail foi aceito.
+  if (sentApprovers.length > 0 && !is_reminder && poc.status === 'ready') {
     const newStatusDates = { ...(poc.status_dates || {}), approval: now }
     await supabase
       .from('pocs')
@@ -105,14 +113,16 @@ export async function POST(req: NextRequest, { params }: Params) {
       .eq('id', params.id)
   }
 
-  await supabase.from('poc_history').insert({
-    poc_id: params.id,
-    emoji: is_reminder ? '⏰' : '📧',
-    event: is_reminder ? 'Reminder de aprovação enviado' : 'E-mails de aprovação enviados',
-    detail: approvers.map((a: { nome: string; email: string }) => `${a.nome} (${a.email})`).join(', '),
-    by_name: user!.name,
-    by_email: user!.email,
-  })
+  if (sentApprovers.length > 0) {
+    await supabase.from('poc_history').insert({
+      poc_id: params.id,
+      emoji: is_reminder ? '⏰' : '📧',
+      event: is_reminder ? 'Reminder de aprovação enviado' : 'E-mails de aprovação enviados',
+      detail: sentApprovers.map((a: { nome: string; email: string }) => `${a.nome} (${a.email})`).join(', '),
+      by_name: user!.name,
+      by_email: user!.email,
+    })
+  }
 
   if (errors.length > 0) {
     return NextResponse.json({ ok: false, error: `Alguns e-mails falharam: ${errors.join('; ')}` }, { status: 207 })

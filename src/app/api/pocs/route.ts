@@ -33,21 +33,8 @@ export async function GET(req: NextRequest) {
     `)
     .order('created_at', { ascending: false })
 
-  if (!user!.is_admin) {
-    // Retorna: minhas POCs + compartilhadas comigo
-    const { data: sharedIds } = await supabase
-      .from('poc_shares')
-      .select('poc_id')
-      .eq('user_email', user!.email)
-
-    const sharedPocIds = (sharedIds || []).map((s) => s.poc_id)
-
-    if (sharedPocIds.length > 0) {
-      query = query.or(`created_by_id.eq.${user!.sub},id.in.(${sharedPocIds.join(',')})`)
-    } else {
-      query = query.eq('created_by_id', user!.sub)
-    }
-  }
+  // O quadro é do time: todos os usuários autenticados podem visualizar todos
+  // os projetos. As permissões de edição continuam restritas ao criador/admin.
 
   const { data, error } = await query
 
@@ -97,12 +84,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: error?.message }, { status: 500 })
   }
 
-  // Inicializa os 4 checks em branco
+  // Inicializa os 5 checks da etapa pós-homologação.
   await supabase.from('poc_checks').insert([
     { poc_id: poc.id, key: 'checklist' },
     { poc_id: poc.id, key: 'playbook' },
     { poc_id: poc.id, key: 'catalogo' },
-    { poc_id: poc.id, key: 'paginaMTM' },
+    { poc_id: poc.id, key: 'paginaMTMChecklist' },
+    { poc_id: poc.id, key: 'paginaMTMPlaybook' },
   ])
 
   // Registra no histórico
